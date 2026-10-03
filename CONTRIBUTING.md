@@ -30,15 +30,23 @@ xcodegen generate --spec project.yml
 git diff --exit-code -- Wavebook.xcodeproj
 ```
 
-Run the repository convenience checks when their tools are installed:
+Run the repository checks when their tools are installed:
 
 ```sh
-just check-pbx
+just ci
 just test
 just lint
 ```
 
-The CI workflow independently regenerates the project, validates shell and Python tooling, runs the `WavebookTests` Debug test scheme, and builds the `Wavebook` Release configuration. Keep generated Xcode output and both SwiftPM lockfile contexts consistent with the repository checks.
+`just ci` mirrors the workflow checks and verifies the current runner's Xcode 16.4 / Swift 6.1.2 toolchain. For exact local parity, select Xcode with:
+
+```sh
+WAVEBOOK_DEVELOPER_DIR="/Applications/Xcode16.4.app/Contents/Developer" just ci
+```
+
+Xcode 16.4 can be downloaded at https://developer.apple.com/download/all.
+
+The normal development requirement remains Xcode 26.6 or later; the older Xcode selection is specifically for reproducing the current Actions runner. `just ci` also regenerates and verifies the project, checks repository tooling, runs tests, and builds Release. `just test` writes an `.xcresult` bundle under `.build`; inspect crash attachments with `xcrun xcresulttool export attachments --path <bundle> --output-path .build/test-attachments --only-failures`. Update the pinned local versions when CI's toolchain changes. `project.yml`'s `xcodeVersion` is XcodeGen metadata, not a toolchain selector.
 
 ## Change expectations
 

@@ -23,7 +23,7 @@ concurrency:
 jobs:
   release:
     if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
-    runs-on: ${{ vars.BLACKSMITH_MACOS_RUNNER || 'macos-15' }}
+    runs-on: macos-15
     environment: release
     timeout-minutes: 60
     env:
