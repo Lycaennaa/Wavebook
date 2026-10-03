@@ -1,0 +1,192 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to build and release
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: wavebook-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    runs-on: ${{ vars.BLACKSMITH_MACOS_RUNNER || 'macos-15' }}
+    environment: release
+    timeout-minutes: 60
+    env:
+      WAVEBOOK_DEVELOPER_DIR: ${{ vars.WAVEBOOK_DEVELOPER_DIR }}
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Select and report toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${WAVEBOOK_DEVELOPER_DIR:-}" ]; then
+            export DEVELOPER_DIR="$WAVEBOOK_DEVELOPER_DIR"
+            printf 'DEVELOPER_DIR=%s\n' "$WAVEBOOK_DEVELOPER_DIR" >> "$GITHUB_ENV"
+          fi
+          test "$(uname -s)" = Darwin
+          xcode-select --print-path
+          xcode_version="$(xcodebuild -version)"
+          printf '%s\n' "$xcode_version"
+          XCODE_VERSION="$xcode_version" python3 - <<'PY'
+          import os
+          import re
+
+          version = os.environ["XCODE_VERSION"].splitlines()[0].split()[1]
+          components = tuple(int(part) for part in re.findall(r"\d+", version))
+          if components[:2] < (26, 6):
+              raise SystemExit(f"Xcode 26.6 or later required; found {version}")
+          PY
+          swift --version
+          python3 --version
+
+      - name: Generate and verify Xcode project
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install xcodegen
+          fi
+          xcodegen --version
+          xcodegen generate --spec project.yml
+          git diff --exit-code -- Wavebook.xcodeproj
+
+      - name: Validate release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$RELEASE_TAG" in
+            v[0-9]*.*) ;;
+            *)
+              printf 'Release tag must look like v0.1.0: %s\n' "$RELEASE_TAG" >&2
+              exit 2
+              ;;
+          esac
+
+          version=${RELEASE_TAG#v}
+          actual=$(VERSION="$version" python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          expected = os.environ["VERSION"]
+          project = Path("Wavebook.xcodeproj/project.pbxproj").read_text()
+          versions = {
+              value.strip()
+              for value in re.findall(r"MARKETING_VERSION = ([^;]+);", project)
+          }
+          if versions != {expected}:
+              raise SystemExit(
+                  f"tag version {expected!r} does not match project versions {sorted(versions)!r}"
+              )
+          print(expected)
+          PY
+          )
+          printf 'WAVEBOOK_VERSION=%s\n' "$actual" >> "$GITHUB_ENV"
+
+      - name: Validate repository tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh -n scripts/package-release.sh scripts/install-hooks.sh
+          python3 -B scripts/check-pbx-identifiers.py
+          python3 -B scripts/check-package-locks.py
+
+      - name: Run SwiftLint
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v swiftlint >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install swiftlint
+          fi
+          swiftlint lint --config .swiftlint.yml
+
+      - name: Run tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project Wavebook.xcodeproj \
+            -scheme WavebookTests \
+            -configuration Debug \
+            -derivedDataPath "$RUNNER_TEMP/wavebook-release-tests" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            SDKROOT=auto \
+            test
+
+      - name: Build and package ad-hoc release
+        shell: bash
+        env:
+          ADHOC_SIGN: YES
+          STRIP_RELEASE: NO
+          APP_NAME: Wavebook
+          BUNDLE_IDENTIFIER: com.lycaennaa.wavebook
+          DIST_DIR: ${{ github.workspace }}/dist
+        run: |
+          set -euo pipefail
+          VERSION="$WAVEBOOK_VERSION" sh scripts/package-release.sh
+
+      - name: Verify archive checksum
+        shell: bash
+        working-directory: dist
+        run: |
+          set -euo pipefail
+          checksum="Wavebook-${WAVEBOOK_VERSION}.zip.sha256"
+          test -s "$checksum"
+          shasum -a 256 -c "$checksum"
+
+      - name: Attest release archive and checksum
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: dist/Wavebook-${{ env.WAVEBOOK_VERSION }}.zip*
+
+      - name: Verify release attestations
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! command -v gh >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install gh
+          fi
+          gh attestation verify "dist/Wavebook-${WAVEBOOK_VERSION}.zip" --repo "$GITHUB_REPOSITORY"
+          gh attestation verify "dist/Wavebook-${WAVEBOOK_VERSION}.zip.sha256" --repo "$GITHUB_REPOSITORY"
+
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! command -v gh >/dev/null 2>&1; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install gh
+          fi
+          gh release create "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "Wavebook $WAVEBOOK_VERSION" \
+            --generate-notes \
+            "dist/Wavebook-$WAVEBOOK_VERSION.zip" \
+            "dist/Wavebook-$WAVEBOOK_VERSION.zip.sha256"
