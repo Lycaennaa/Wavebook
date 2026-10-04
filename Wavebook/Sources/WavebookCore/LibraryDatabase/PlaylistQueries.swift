@@ -20,7 +20,7 @@ private extension PlaylistTrackQuery {
         )
     }
 }
-private struct SystemPlaylistQuerySpec {
+private struct SystemPlaylistPlan {
     let join: String
     let whereClause: String
     let orderBy: String
@@ -63,16 +63,16 @@ private extension LibraryDatabase {
         return "\(primary), \(smartPlaylistTieBreakSQL)"
     }
 
-    static func systemPlaylistSpec(_ kind: SystemPlaylistKind) -> SystemPlaylistQuerySpec {
-        switch kind {
+    static func systemPlaylistPlan(_ query: SystemPlaylistQuery) -> SystemPlaylistPlan {
+        switch query {
         case .recentlyAdded:
-            return SystemPlaylistQuerySpec(
+            return SystemPlaylistPlan(
                 join: "",
                 whereClause: "1 = 1",
                 orderBy: "tracks.firstSeenAtUTC DESC, tracks.id ASC"
             )
         case .mostPlayed:
-            return SystemPlaylistQuerySpec(
+            return SystemPlaylistPlan(
                 join: Self.playlistHistoryJoin,
                 whereClause: "COALESCE(playlistHistory.qualifiedPlayCount, 0) > 0",
                 orderBy: """
@@ -86,7 +86,7 @@ private extension LibraryDatabase {
                     """
             )
         case .favorites:
-            return SystemPlaylistQuerySpec(
+            return SystemPlaylistPlan(
                 join: "",
                 whereClause: "tracks.isFavorite = 1",
                 orderBy: """
@@ -97,6 +97,18 @@ private extension LibraryDatabase {
                     tracks.id ASC
                     """
             )
+        case let .lyrics(lyricsFilter):
+            let negation = lyricsFilter == .withLRC ? "" : "NOT "
+            return SystemPlaylistPlan(
+                join: "",
+                whereClause: """
+                    \(negation)EXISTS (
+                        SELECT 1 FROM lyricFiles
+                        WHERE lyricFiles.lyricsKey = tracks.lyricsKey
+                    )
+                    """,
+                orderBy: "tracks.title COLLATE NOCASE ASC, tracks.title ASC, tracks.id ASC"
+            )
         }
     }
 
@@ -106,6 +118,21 @@ private extension LibraryDatabase {
         offset: Int,
         database: Database
     ) throws -> LibraryPlaylistTrackPage {
+        let totalCount: Int?
+        if offset == 0 {
+            totalCount = try Int.fetchOne(
+                database,
+                sql: """
+                    SELECT COUNT(*)
+                    FROM tracks
+                    \(query.join)
+                    WHERE \(query.whereClause)
+                    """,
+                arguments: query.arguments
+            ) ?? 0
+        } else {
+            totalCount = nil
+        }
         var queryArguments = query.arguments
         queryArguments += [limit + 1, offset]
         let rows = try Row.fetchAll(
@@ -131,7 +158,8 @@ private extension LibraryDatabase {
             items: tracks,
             offset: offset,
             limit: limit,
-            hasMore: hasMore
+            hasMore: hasMore,
+            totalCount: totalCount
         )
     }
 
@@ -294,7 +322,7 @@ extension LibraryDatabase {
 
     /// Reads one page from a system playlist.
     public func systemPlaylistPage(
-        _ kind: SystemPlaylistKind,
+        for selection: SystemPlaylistQuery,
         limit: Int = LibraryDatabase.defaultTrackPageSize,
         offset: Int = 0,
         query: String = ""
@@ -306,7 +334,7 @@ extension LibraryDatabase {
                     items: [], offset: bounds.offset, limit: bounds.limit, hasMore: false
                 )
             }
-            let spec = Self.systemPlaylistSpec(kind)
+            let spec = Self.systemPlaylistPlan(selection)
             return try Self.fetchPlaylistTrackPage(
                 spec.trackQuery.matching(searchText: query),
                 limit: bounds.limit,
@@ -316,12 +344,27 @@ extension LibraryDatabase {
         }
     }
 
+    /// Reads one page from a system playlist using its default Lyrics filter.
+    public func systemPlaylistPage(
+        _ kind: SystemPlaylistKind,
+        limit: Int = LibraryDatabase.defaultTrackPageSize,
+        offset: Int = 0,
+        query: String = ""
+    ) throws -> LibraryPlaylistTrackPage {
+        try systemPlaylistPage(
+            for: SystemPlaylistQuery(legacyKind: kind),
+            limit: limit,
+            offset: offset,
+            query: query
+        )
+    }
+
     /// Reads a page of recently added live tracks.
     public func recentlyAddedPage(
         limit: Int = LibraryDatabase.defaultTrackPageSize,
         offset: Int = 0
     ) throws -> LibraryPlaylistTrackPage {
-        try systemPlaylistPage(.recentlyAdded, limit: limit, offset: offset)
+        try systemPlaylistPage(for: .recentlyAdded, limit: limit, offset: offset)
     }
 
     /// Reads a page of most-played live tracks.
@@ -329,7 +372,7 @@ extension LibraryDatabase {
         limit: Int = LibraryDatabase.defaultTrackPageSize,
         offset: Int = 0
     ) throws -> LibraryPlaylistTrackPage {
-        try systemPlaylistPage(.mostPlayed, limit: limit, offset: offset)
+        try systemPlaylistPage(for: .mostPlayed, limit: limit, offset: offset)
     }
 
     /// Reads a page of favorite live tracks.
@@ -337,7 +380,7 @@ extension LibraryDatabase {
         limit: Int = LibraryDatabase.defaultTrackPageSize,
         offset: Int = 0
     ) throws -> LibraryPlaylistTrackPage {
-        try systemPlaylistPage(.favorites, limit: limit, offset: offset)
+        try systemPlaylistPage(for: .favorites, limit: limit, offset: offset)
     }
 
     /// Compatibility spelling for favorite paging.
@@ -425,29 +468,60 @@ extension LibraryDatabase {
 
     /// Resolves a system playlist to its complete current playable track sequence.
     public func resolvePlaylist(
-        _ kind: SystemPlaylistKind,
-        matching query: String = ""
+        for selection: SystemPlaylistQuery,
+        matching queryText: String = ""
     ) throws -> [Track] {
         try readCatalog { database in
             return try Self.fetchPlaylistTracks(
-                Self.systemPlaylistSpec(kind).trackQuery.matching(searchText: query),
+                Self.systemPlaylistPlan(selection).trackQuery.matching(searchText: queryText),
                 database: database
             )
         }
     }
+    /// Resolves a system playlist using its default Lyrics filter.
+    public func resolvePlaylist(
+        _ kind: SystemPlaylistKind,
+        matching query: String = ""
+    ) throws -> [Track] {
+        try resolvePlaylist(for: SystemPlaylistQuery(legacyKind: kind), matching: query)
+    }
+
     /// Resolves a system playlist directly into the bounded playback queue.
     public func resolvePlaylistQueue(
-        _ kind: SystemPlaylistKind,
-        matching query: String = "",
+        for selection: SystemPlaylistQuery,
+        matching queryText: String = "",
         source: ListeningPlaybackSource
     ) throws -> PlaybackQueue {
         try readCatalog { database in
             try Self.fetchPlaylistQueue(
-                Self.systemPlaylistSpec(kind).trackQuery.matching(searchText: query),
+                Self.systemPlaylistPlan(selection).trackQuery.matching(searchText: queryText),
                 source: source,
                 database: database
             )
         }
     }
+    /// Resolves a system playlist queue using its default Lyrics filter.
+    public func resolvePlaylistQueue(
+        _ kind: SystemPlaylistKind,
+        matching query: String = "",
+        source: ListeningPlaybackSource
+    ) throws -> PlaybackQueue {
+        try resolvePlaylistQueue(
+            for: SystemPlaylistQuery(legacyKind: kind),
+            matching: query,
+            source: source
+        )
+    }
 
+}
+
+private extension SystemPlaylistQuery {
+    init(legacyKind kind: SystemPlaylistKind) {
+        switch kind {
+        case .recentlyAdded: self = .recentlyAdded
+        case .mostPlayed: self = .mostPlayed
+        case .favorites: self = .favorites
+        case .lyrics: self = .lyrics(.withLRC)
+        }
+    }
 }

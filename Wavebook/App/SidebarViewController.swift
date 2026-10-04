@@ -48,6 +48,7 @@ final class SidebarViewController: NSViewController {
     private var buttons: [LibraryPage: NSButton] = [:]
     private var playlistButtons: [SidebarPlaylistButton] = []
     private var playlistStack: NSStackView?
+    private var sectionDivider: NSView?
     private var selectedPage: LibraryPage = .songs
     private var selectedPlaylist: PlaylistDestination?
 
@@ -58,8 +59,8 @@ final class SidebarViewController: NSViewController {
         let stack = NSStackView()
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.spacing = 8
-        stack.edgeInsets = NSEdgeInsets(top: 56, left: 18, bottom: 18, right: 18)
+        stack.spacing = 10
+        stack.edgeInsets = NSEdgeInsets(top: 16, left: 18, bottom: 18, right: 18)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
         let pages = LibraryPage.allCases.filter { $0 != .search && $0 != .playlists }
@@ -72,10 +73,11 @@ final class SidebarViewController: NSViewController {
             stack.addArrangedSubview(button)
         }
 
+        addPlaylistSectionDivider(to: stack, after: pages.last.flatMap { buttons[$0] })
         let playlistStack = NSStackView()
         playlistStack.orientation = .vertical
         playlistStack.alignment = .leading
-        playlistStack.spacing = 8
+        playlistStack.spacing = 10
         let section = NSTextField(labelWithString: "PLAYLISTS")
         section.font = .systemFont(ofSize: 11, weight: .bold)
         section.textColor = AppTheme.secondaryText
@@ -110,6 +112,19 @@ final class SidebarViewController: NSViewController {
         ])
         view = root
         applySelection()
+    }
+
+    private func addPlaylistSectionDivider(to stack: NSStackView, after lastPage: NSButton?) {
+        if let lastPage {
+            stack.setCustomSpacing(14, after: lastPage)
+        }
+        let separator = NSView()
+        separator.wantsLayer = true
+        separator.heightAnchor.constraint(equalToConstant: 2).isActive = true
+        sectionDivider = separator
+        stack.addArrangedSubview(separator)
+        separator.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -36).isActive = true
+        stack.setCustomSpacing(14, after: separator)
     }
 
     private func addPlaylistButton(title: String, destination: PlaylistDestination, to stack: NSStackView) {
@@ -181,9 +196,11 @@ final class SidebarViewController: NSViewController {
             button.contentTintColor = page == selectedPage ? AppTheme.accent : AppTheme.secondaryText
         }
         for button in playlistButtons {
-            let isSelected = selectedPage == .playlists && selectedPlaylist == button.destination
+            let isSelected = selectedPage == .playlists
+                && selectedPlaylist == button.destination
             button.font = .systemFont(ofSize: 15, weight: isSelected ? .semibold : .regular)
             button.contentTintColor = isSelected ? AppTheme.accent : AppTheme.secondaryText
         }
+        sectionDivider?.layer?.backgroundColor = AppTheme.secondaryText.withAlphaComponent(0.45).cgColor
     }
 }

@@ -23,7 +23,7 @@ The following describes capabilities visible in the current source tree. Listed 
 
 ## Playlists and favorites
 
-- Mark tracks as favorites and use the built-in **Recently Added**, **Most Played**, and **Favorites** playlists.
+- Mark tracks as favorites and use the built-in **Recently Added**, **Most Played**, **Favorites**, and **Lyrics** playlists. Filter Lyrics by tracks with or without an indexed `.lrc` file.
 - Create, rename, and delete manual or smart playlists. Reorder and remove items in manual playlists; unavailable tracks retain their saved display details until cleared.
 - Define smart-playlist rules as JSON and choose a supported sort field and direction.
 - Add selected tracks to manual playlists.

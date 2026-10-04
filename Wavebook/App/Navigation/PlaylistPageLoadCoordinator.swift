@@ -6,20 +6,47 @@ enum PlaylistPageContent: Sendable {
     case tracks(LibraryPlaylistTrackPage)
 }
 
+enum PlaylistRequestSelection: Sendable, Equatable {
+    case system(SystemPlaylistQuery)
+    case user(Int64)
+
+    nonisolated var destination: PlaylistDestination {
+        switch self {
+        case let .system(query): .system(query.playlistKind)
+        case let .user(id): .user(id)
+        }
+    }
+    static func from(_ destination: PlaylistDestination, filter: LyricsPlaylistFilter) -> Self {
+        switch destination {
+        case .system(.recentlyAdded): return .system(.recentlyAdded)
+        case .system(.mostPlayed): return .system(.mostPlayed)
+        case .system(.favorites): return .system(.favorites)
+        case .system(.lyrics): return .system(.lyrics(filter))
+        case let .user(id): return .user(id)
+        }
+    }
+}
+
 struct PlaylistPageLoadRequest: Sendable {
-    let destination: PlaylistDestination
+    let selection: PlaylistRequestSelection
     let query: String
     let limit: Int
     let offset: Int
+    nonisolated var destination: PlaylistDestination { selection.destination }
 
     nonisolated func load(from database: LibraryDatabase) throws -> PlaylistPageLoadResult {
         try Task.checkCancellation()
-        switch destination {
-        case let .system(kind):
-            let page = try database.systemPlaylistPage(kind, limit: limit, offset: offset, query: query)
+        switch selection {
+        case let .system(systemQuery):
+            let page = try database.systemPlaylistPage(
+                for: systemQuery,
+                limit: limit,
+                offset: offset,
+                query: query
+            )
             return PlaylistPageLoadResult(
                 destination: destination,
-                title: kind.displayName,
+                title: systemQuery.playlistKind.displayName,
                 kind: nil,
                 definition: nil,
                 content: .tracks(page)
@@ -153,17 +180,18 @@ final class PlaylistPageLoadCoordinator {
 }
 
 struct PlaylistPlaybackLoadRequest: Sendable, Equatable {
-    let destination: PlaylistDestination
+    let selection: PlaylistRequestSelection
     let query: String
     let source: ListeningPlaybackSource
     let startingAt: PlaylistPlaybackStart
+    nonisolated var destination: PlaylistDestination { selection.destination }
 
     nonisolated func load(from database: LibraryDatabase) throws -> PlaybackQueue {
         try Task.checkCancellation()
         let queue: PlaybackQueue
-        switch destination {
-        case let .system(kind):
-            queue = try database.resolvePlaylistQueue(kind, matching: query, source: source)
+        switch selection {
+        case let .system(systemQuery):
+            queue = try database.resolvePlaylistQueue(for: systemQuery, matching: query, source: source)
         case let .user(id):
             queue = try database.resolvePlaylistQueue(id: id, matching: query, source: source)
         }

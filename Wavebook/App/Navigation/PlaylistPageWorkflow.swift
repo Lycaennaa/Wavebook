@@ -19,6 +19,37 @@ struct PlaylistPageWorkflowContext {
     )
 }
 
+private struct PlaylistEditorSettings {
+    let title: String
+    let definition: PlaylistDefinition
+    let allowsKindSelection: Bool
+    let requiresName: Bool
+}
+
+private enum PlaylistEditorOperation {
+    case create
+    case editSmart(PlaylistDefinition)
+
+    var settings: PlaylistEditorSettings {
+        switch self {
+        case .create:
+            return PlaylistEditorSettings(
+                title: "Create Playlist",
+                definition: .manual,
+                allowsKindSelection: true,
+                requiresName: true
+            )
+        case let .editSmart(definition):
+            return PlaylistEditorSettings(
+                title: "Edit Smart Playlist",
+                definition: definition,
+                allowsKindSelection: false,
+                requiresName: false
+            )
+        }
+    }
+}
+
 @MainActor
 final class PlaylistPageWorkflow {
     private let databaseProvider: () -> LibraryDatabase?
@@ -59,12 +90,7 @@ final class PlaylistPageWorkflow {
     }
 
     func create() {
-        presentEditor(
-            title: "Create Playlist",
-            name: "",
-            definition: .manual,
-            allowsKindSelection: true
-        ) { [weak self] values in
+        presentEditor(.create) { [weak self] values in
             guard let self else { return }
             let origin = self.contextProvider().destination
             self.performMutation({ database in
@@ -101,12 +127,7 @@ final class PlaylistPageWorkflow {
         guard case let .user(id) = context.destination,
               case .smart = context.definition,
               let definition = context.definition else { return }
-        presentEditor(
-            title: "Edit Smart Playlist",
-            name: "",
-            definition: definition,
-            allowsKindSelection: false
-        ) { [weak self] values in
+        presentEditor(.editSmart(definition)) { [weak self] values in
             guard let self,
                   case let .smart(rulesJSON, sortField, sortDescending) = values.definition else { return }
             self.performMutation({ database in
@@ -206,18 +227,20 @@ final class PlaylistPageWorkflow {
     }
 
     private func presentEditor(
-        title: String,
-        name: String,
-        definition: PlaylistDefinition?,
-        allowsKindSelection: Bool,
+        _ operation: PlaylistEditorOperation,
         completion: @escaping (PlaylistEditorValues) -> Void
     ) {
+        let settings = operation.settings
         let editor = PlaylistEditorView(
-            name: name,
-            definition: definition,
-            allowsKindSelection: allowsKindSelection
+            name: "",
+            definition: settings.definition,
+            allowsKindSelection: settings.allowsKindSelection
         )
-        let panel = PlaylistEditorPanelController(title: title, editor: editor)
+        let panel = PlaylistEditorPanelController(
+            title: settings.title,
+            editor: editor,
+            requiresName: settings.requiresName
+        )
         guard let values = panel.run() else { return }
         completion(values)
     }

@@ -60,7 +60,20 @@ extension LibraryDatabase {
         let trimmed = PlaylistNamePolicy.trimmed(name)
         guard !trimmed.isEmpty else { throw LibraryDatabaseError.invalidPlaylistName }
         let key = PlaylistNamePolicy.normalizedKey(trimmed)
-        guard !PlaylistNamePolicy.reservedNames.contains(key) else {
+        let isReservedName = PlaylistNamePolicy.reservedNames.contains(key)
+        let preservesExistingReservedName: Bool
+        if isReservedName,
+           let excludingID,
+           let existingName = try String.fetchOne(
+               database,
+               sql: "SELECT name FROM playlists WHERE id = ?",
+               arguments: [excludingID]
+           ) {
+            preservesExistingReservedName = PlaylistNamePolicy.normalizedKey(existingName) == key
+        } else {
+            preservesExistingReservedName = false
+        }
+        guard !isReservedName || preservesExistingReservedName else {
             throw LibraryDatabaseError.reservedPlaylistName(trimmed)
         }
         let rows = try Row.fetchAll(database, sql: "SELECT id, name FROM playlists")
@@ -79,10 +92,6 @@ extension LibraryDatabase {
         let name: String = row["name"]
         guard PlaylistNamePolicy.trimmed(name) == name, !name.isEmpty else {
             throw LibraryDatabaseError.invalidPlaylistName
-        }
-        let normalizedName = PlaylistNamePolicy.normalizedKey(name)
-        guard !PlaylistNamePolicy.reservedNames.contains(normalizedName) else {
-            throw LibraryDatabaseError.reservedPlaylistName(name)
         }
         guard let kind = PlaylistKind(rawValue: row["kind"]),
               let createdAtUTC = Self.date(from: row, column: "createdAtUTC") else {

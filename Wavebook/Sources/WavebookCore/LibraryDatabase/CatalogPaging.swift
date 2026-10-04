@@ -10,13 +10,16 @@ public struct LibraryCatalogPage<Item: Hashable & Sendable>: Hashable, Sendable 
     public let limit: Int
     /// Whether another page is available.
     public let hasMore: Bool
+    /// Total number of matching catalog values, when computed by the query.
+    public let totalCount: Int?
 
     /// Creates a catalog page.
-    public init(items: [Item], offset: Int, limit: Int, hasMore: Bool) {
+    public init(items: [Item], offset: Int, limit: Int, hasMore: Bool, totalCount: Int? = nil) {
         self.items = items
         self.offset = offset
         self.limit = limit
         self.hasMore = hasMore
+        self.totalCount = totalCount
     }
 }
 

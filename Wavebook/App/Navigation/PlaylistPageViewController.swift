@@ -68,6 +68,7 @@ final class PlaylistPageViewController: NSViewController, NavigationHost, Playli
     private let deleteButton = NSButton(title: "Delete", target: nil, action: nil)
     private let clearUnavailableButton = NSButton(title: "Clear Unavailable", target: nil, action: nil)
     private let removeButton = NSButton(title: "Remove Selected", target: nil, action: nil)
+    private let lyricsFilterControl = LyricsPlaylistFilterControl(frame: .zero)
     private let liveSongList = SongListViewController()
     private let manualItemList = PlaylistItemListViewController()
 
@@ -163,7 +164,7 @@ final class PlaylistPageViewController: NSViewController, NavigationHost, Playli
 
     private func startLoad(database: LibraryDatabase, offset: Int, replacing: Bool) {
         let request = PlaylistPageLoadRequest(
-            destination: playlistDestination,
+            selection: PlaylistRequestSelection.from(playlistDestination, filter: lyricsFilterControl.filter),
             query: query,
             limit: Self.pageSize,
             offset: offset
@@ -245,7 +246,7 @@ final class PlaylistPageViewController: NSViewController, NavigationHost, Playli
         }
 
         let request = PlaylistPlaybackLoadRequest(
-            destination: playlistDestination,
+            selection: PlaylistRequestSelection.from(playlistDestination, filter: lyricsFilterControl.filter),
             query: playbackQuery,
             source: playbackSource,
             startingAt: start
@@ -262,7 +263,7 @@ final class PlaylistPageViewController: NSViewController, NavigationHost, Playli
                 self.updateControls()
                 self.onPlayPlaylist?(queue)
             },
-            onFailure: { [weak self] request, error in
+            onFailure: { [weak self] _, error in
                 guard let self,
                       self.isActive,
                       self.playlistDestination == request.destination,
@@ -287,7 +288,7 @@ final class PlaylistPageViewController: NSViewController, NavigationHost, Playli
 
     private func renderContent() {
         switch loadedContent {
-        case let .manual(items, hasMore):
+        case let .manual(items, hasMore, totalCount):
             liveSongList.view.isHidden = true
             manualItemList.view.isHidden = false
             liveSongList.setTracks([], hasMore: false)
@@ -299,14 +300,16 @@ final class PlaylistPageViewController: NSViewController, NavigationHost, Playli
             let unavailableCount = items.reduce(into: 0) { count, item in
                 if !item.isAvailable { count += 1 }
             }
-            subtitleLabel.stringValue = "\(items.count) items\(hasMore ? "+" : "")"
-                + (unavailableCount > 0 ? " • \(unavailableCount) unavailable" : "")
-        case let .tracks(items, hasMore):
+            subtitleLabel.stringValue = "\(totalCount) items"
+            if !hasMore, totalCount == items.count, unavailableCount > 0 {
+                subtitleLabel.stringValue += " • \(unavailableCount) unavailable"
+            }
+        case let .tracks(items, hasMore, totalCount):
             liveSongList.view.isHidden = false
             manualItemList.view.isHidden = true
             manualItemList.clear()
             liveSongList.setTracks(items, hasMore: hasMore)
-            subtitleLabel.stringValue = "\(items.count) tracks\(hasMore ? "+" : "")"
+            subtitleLabel.stringValue = "\(totalCount) tracks"
         case nil:
             clearRenderedContent()
             subtitleLabel.stringValue = ""
@@ -330,6 +333,7 @@ final class PlaylistPageViewController: NSViewController, NavigationHost, Playli
         deleteButton.isHidden = !isUser
         clearUnavailableButton.isHidden = !isManual
         removeButton.isHidden = !isManual
+        lyricsFilterControl.show(for: playlistDestination)
         playButton.isEnabled = loadedContent != nil
             && !workflow.isRunning
             && !playbackLoadCoordinator.isLoading
@@ -381,9 +385,11 @@ final class PlaylistPageViewController: NSViewController, NavigationHost, Playli
     @objc private func playClicked() {
         startPlaylistPlayback()
     }
+
 }
 
 private extension PlaylistPageViewController {
+
     func configureView() {
         let root = ThemeBackgroundView()
         titleLabel.font = .systemFont(ofSize: 22, weight: .semibold)
@@ -403,6 +409,7 @@ private extension PlaylistPageViewController {
         deleteButton.action = #selector(deleteClicked)
         clearUnavailableButton.action = #selector(clearUnavailableClicked)
         removeButton.action = #selector(removeClicked)
+        lyricsFilterControl.onFilterChange = { [weak self] in self?.refresh() }
 
         let titleStack = NSStackView(views: [titleLabel, subtitleLabel])
         titleStack.orientation = .vertical
@@ -410,7 +417,7 @@ private extension PlaylistPageViewController {
         titleStack.spacing = 3
         let header = NSStackView(
             views: [
-                titleStack, playButton, createButton, renameButton, editSmartButton, deleteButton,
+                titleStack, lyricsFilterControl, playButton, createButton, renameButton, editSmartButton, deleteButton,
                 clearUnavailableButton, removeButton
             ]
         )

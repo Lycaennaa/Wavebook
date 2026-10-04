@@ -3,6 +3,35 @@ import Foundation
 import XCTest
 
 final class PlaylistRepositoryTests: XCTestCase {
+    func testCreatePlaylistRejectsEmptyName() throws {
+        let database = try LibraryDatabase(inMemory: true)
+
+        XCTAssertThrowsError(try database.createPlaylist(name: "", definition: .manual)) { error in
+            XCTAssertEqual(error as? LibraryDatabaseError, .invalidPlaylistName)
+        }
+    }
+
+    func testLegacyReservedNameRemainsReadableAndCanBeKept() throws {
+        let database = try LibraryDatabase(inMemory: true)
+        let legacyName = "Lýrics"
+        let playlistID = try database.writer.write { connection in
+            try connection.execute(
+                sql: "INSERT INTO playlists (name, kind, createdAtUTC) VALUES (?, ?, ?)",
+                arguments: [legacyName, PlaylistKind.manual.rawValue, 0]
+            )
+            return connection.lastInsertedRowID
+        }
+
+        XCTAssertEqual(try database.playlists().map(\.id), [playlistID])
+        XCTAssertEqual(try database.playlist(id: playlistID)?.name, legacyName)
+        XCTAssertEqual(try database.renamePlaylist(id: playlistID, to: legacyName).name, legacyName)
+
+        let other = try database.createPlaylist(name: "Other", definition: .manual)
+        XCTAssertThrowsError(try database.renamePlaylist(id: other.id, to: "lyrics")) { error in
+            XCTAssertEqual(error as? LibraryDatabaseError, .reservedPlaylistName("lyrics"))
+        }
+    }
+
     func testManualPlaylistLifecyclePreservesSelectionAndUnavailableSnapshot() throws {
         let root = try makeRoot(named: "manual")
         let database = try LibraryDatabase(inMemory: true)
@@ -42,6 +71,10 @@ final class PlaylistRepositoryTests: XCTestCase {
         )
         XCTAssertEqual(page.items.count, 1)
         XCTAssertEqual(page.items[0].track?.id, secondID)
+        XCTAssertEqual(page.totalCount, 1)
+        let firstPlaylistPage = try database.playlistItemPage(playlistID: playlist.id, limit: 1)
+        XCTAssertEqual(firstPlaylistPage.totalCount, 3)
+        XCTAssertTrue(firstPlaylistPage.hasMore)
 
         try database.reorderPlaylistItem(id: added.itemIDs[2], toOrdinal: 0)
         let orderedIDs = try database.playlistItemPage(playlistID: playlist.id, limit: 10)
@@ -103,15 +136,9 @@ final class PlaylistRepositoryTests: XCTestCase {
         let recent = try database.recentlyAddedPage(limit: 1)
         XCTAssertEqual(recent.items.count, 1)
         XCTAssertTrue(recent.hasMore)
-        let searchedRecent = try database.systemPlaylistPage(.recentlyAdded, limit: 10, query: "bjork")
-        XCTAssertEqual(searchedRecent.items.compactMap(\.id), [firstID])
         let searchedSmart = try database.smartPlaylistPage(playlistID: smart.id, limit: 10, query: "artist")
         XCTAssertEqual(
             try database.resolvePlaylist(id: smart.id, matching: "bjork").map(\.id),
-            [firstID]
-        )
-        XCTAssertEqual(
-            try database.resolvePlaylist(.recentlyAdded, matching: "bjork").map(\.id),
             [firstID]
         )
         XCTAssertEqual(searchedSmart.items.compactMap(\.id), [firstID])
@@ -126,6 +153,80 @@ final class PlaylistRepositoryTests: XCTestCase {
         ) { error in
             XCTAssertEqual(error as? LibraryDatabaseError, .reservedPlaylistName("favorites"))
         }
+    }
+
+    func testLegacySystemPlaylistAPIsRemainCompatible() throws {
+        let root = try makeRoot(named: "legacy-system")
+        let database = try LibraryDatabase(inMemory: true)
+        let rootID = try database.addRoot(path: root.path)
+        let trackID = try database.save(
+            track: makeTrack(
+                path: root.appendingPathComponent("legacy.flac").path,
+                title: "Legacy Track",
+                artist: "Artist",
+                resource: "legacy"
+            ),
+            rootID: rootID
+        )
+        let kind: SystemPlaylistKind = .recentlyAdded
+
+        XCTAssertEqual(try database.systemPlaylistPage(kind).items.compactMap(\.id), [trackID])
+        XCTAssertEqual(try database.resolvePlaylist(kind).map(\.id), [trackID])
+        let queue = try database.resolvePlaylistQueue(
+            kind,
+            source: ListeningPlaybackSource(
+                kind: .playlist,
+                persistentID: kind.playbackPersistentID,
+                sourceName: kind.displayName
+            )
+        )
+        XCTAssertEqual(queue.queuedItems.map(\.id), [trackID])
+    }
+
+    func testLyricsPlaylistFilterSeparatesTracksAndReportsFilteredCounts() throws {
+        let root = try makeRoot(named: "lyrics")
+        let database = try LibraryDatabase(inMemory: true)
+        let withLyricsURL = root.appendingPathComponent("with-lyrics.flac")
+        let withoutLyricsURL = root.appendingPathComponent("without-lyrics.flac")
+        let secondWithoutLyricsURL = root.appendingPathComponent("without-lyrics-2.flac")
+        let lyricURL = root.appendingPathComponent("with-lyrics.lrc")
+
+        try database.reconcile(
+            rootPath: root.path,
+            tracks: [
+                makeTrack(path: withLyricsURL.path, title: "Has LRC", artist: "Artist", resource: "with"),
+                makeTrack(path: withoutLyricsURL.path, title: "No LRC", artist: "Artist", resource: "without"),
+                makeTrack(
+                    path: secondWithoutLyricsURL.path,
+                    title: "No Lyrics",
+                    artist: "Artist",
+                    resource: "without-2"
+                )
+            ],
+            lyricFiles: [lyricURL]
+        )
+
+        let withLyricsPage = try database.systemPlaylistPage(for: .lyrics(.withLRC), limit: 10)
+        XCTAssertEqual(withLyricsPage.items.map(\.title), ["Has LRC"])
+        XCTAssertEqual(withLyricsPage.totalCount, 1)
+
+        let withoutLyricsPage = try database.systemPlaylistPage(for: .lyrics(.withoutLRC), limit: 1)
+        XCTAssertEqual(withoutLyricsPage.items.map(\.title), ["No LRC"])
+        XCTAssertEqual(withoutLyricsPage.totalCount, 2)
+        XCTAssertTrue(withoutLyricsPage.hasMore)
+        XCTAssertEqual(
+            try database.resolvePlaylist(for: .lyrics(.withoutLRC)).map(\.title),
+            ["No LRC", "No Lyrics"]
+        )
+        let withoutLyricsQueue = try database.resolvePlaylistQueue(
+            for: .lyrics(.withoutLRC),
+            source: ListeningPlaybackSource(
+                kind: .playlist,
+                persistentID: SystemPlaylistKind.lyrics.playbackPersistentID,
+                sourceName: SystemPlaylistKind.lyrics.displayName
+            )
+        )
+        XCTAssertEqual(withoutLyricsQueue.queuedItems.map(\.title), ["No LRC", "No Lyrics"])
     }
 
     func testMostPlayedUsesQualifiedHistoryAndPaging() throws {

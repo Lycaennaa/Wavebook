@@ -35,12 +35,14 @@ private final class PlaylistEditorPanelSurfaceView: ThemeBackgroundView {
 @MainActor
 final class PlaylistEditorPanelController: NSWindowController, NSWindowDelegate {
     private let editor: PlaylistEditorView
+    private let requiresName: Bool
     private let saveButton = NSButton(title: "Save", target: nil, action: nil)
     private let cancelButton = NSButton(title: "Cancel", target: nil, action: nil)
     private var isModalRunning = false
 
-    init(title: String, editor: PlaylistEditorView) {
+    init(title: String, editor: PlaylistEditorView, requiresName: Bool) {
         self.editor = editor
+        self.requiresName = requiresName
         let panel = PlaylistEditorPanel(
             contentRect: NSRect(x: 0, y: 0, width: 470, height: 470),
             styleMask: [.borderless, .closable],
@@ -56,7 +58,8 @@ final class PlaylistEditorPanelController: NSWindowController, NSWindowDelegate 
         panel.isMovableByWindowBackground = true
         panel.level = .modalPanel
         super.init(window: panel)
-        panel.isReleasedWhenClosed = true
+        // Keep ownership with NSWindowController through modal teardown.
+        panel.isReleasedWhenClosed = false
         panel.delegate = self
         configureButtons()
         panel.contentView = makeContentView()
@@ -83,7 +86,10 @@ final class PlaylistEditorPanelController: NSWindowController, NSWindowDelegate 
     private func configureButtons() {
         saveButton.bezelStyle = .rounded
         saveButton.bezelColor = AppTheme.accent
-        saveButton.contentTintColor = .white
+        saveButton.attributedTitle = NSAttributedString(
+            string: saveButton.title,
+            attributes: [.foregroundColor: NSColor.black]
+        )
         saveButton.keyEquivalent = "\r"
         saveButton.target = self
         saveButton.action = #selector(save)
@@ -93,7 +99,10 @@ final class PlaylistEditorPanelController: NSWindowController, NSWindowDelegate 
 
         cancelButton.bezelStyle = .rounded
         cancelButton.bezelColor = AppTheme.raised
-        cancelButton.contentTintColor = AppTheme.primaryText
+        cancelButton.attributedTitle = NSAttributedString(
+            string: cancelButton.title,
+            attributes: [.foregroundColor: AppTheme.primaryText]
+        )
         cancelButton.keyEquivalent = "\u{1b}"
         cancelButton.target = self
         cancelButton.action = #selector(cancel)
@@ -150,6 +159,11 @@ final class PlaylistEditorPanelController: NSWindowController, NSWindowDelegate 
     }
 
     @objc private func save() {
+        guard !requiresName || !editor.values.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            editor.focusNameField()
+            NSSound.beep()
+            return
+        }
         finish(with: .OK)
     }
 

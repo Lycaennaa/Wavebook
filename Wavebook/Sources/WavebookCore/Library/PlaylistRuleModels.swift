@@ -8,6 +8,8 @@ public enum SystemPlaylistKind: String, CaseIterable, Codable, Hashable, Sendabl
     case mostPlayed
     /// Live tracks marked as favorites.
     case favorites
+    /// Live tracks filtered by indexed LRC availability.
+    case lyrics
 
     /// Stable identity.
     public var id: Self { self }
@@ -18,6 +20,7 @@ public enum SystemPlaylistKind: String, CaseIterable, Codable, Hashable, Sendabl
         case .recentlyAdded: return "Recently Added"
         case .mostPlayed: return "Most Played"
         case .favorites: return "Favorites"
+        case .lyrics: return "Lyrics"
         }
     }
 
@@ -27,6 +30,39 @@ public enum SystemPlaylistKind: String, CaseIterable, Codable, Hashable, Sendabl
         case .recentlyAdded: return -1
         case .mostPlayed: return -2
         case .favorites: return -3
+        case .lyrics: return -4
+        }
+    }
+}
+
+/// Selects which side of indexed LRC availability a Lyrics playlist shows.
+public enum LyricsPlaylistFilter: Int, CaseIterable, Hashable, Sendable {
+    /// Tracks with an associated indexed LRC file.
+    case withLRC
+    /// Tracks without an associated indexed LRC file.
+    case withoutLRC
+
+    public var displayName: String {
+        switch self {
+        case .withLRC: return "With LRC"
+        case .withoutLRC: return "Without LRC"
+        }
+    }
+}
+
+/// Identifies one system-playlist query, including its Lyrics-only filter.
+public enum SystemPlaylistQuery: Hashable, Sendable {
+    case recentlyAdded
+    case mostPlayed
+    case favorites
+    case lyrics(LyricsPlaylistFilter)
+
+    public var playlistKind: SystemPlaylistKind {
+        switch self {
+        case .recentlyAdded: return .recentlyAdded
+        case .mostPlayed: return .mostPlayed
+        case .favorites: return .favorites
+        case .lyrics: return .lyrics
         }
     }
 }

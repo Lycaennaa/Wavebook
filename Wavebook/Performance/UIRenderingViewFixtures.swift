@@ -200,7 +200,7 @@ enum UIRenderingViewFixtures {
             sortDescending: true
         )
         let editor = PlaylistEditorView(name: "Performance playlist", definition: definition, allowsKindSelection: true)
-        let controller = PlaylistEditorPanelController(title: "Smart Playlist", editor: editor)
+        let controller = PlaylistEditorPanelController(title: "Smart Playlist", editor: editor, requiresName: true)
         return try windowTarget(controller)
     }
 

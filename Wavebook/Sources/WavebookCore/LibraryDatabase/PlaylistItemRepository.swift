@@ -259,6 +259,21 @@ extension LibraryDatabase {
             try Self.requireManualPlaylist(id: playlistID, db: database)
             PlaylistSQLFunctions.install(in: database)
             let search = PlaylistSearchPolicy.manualPredicate(query: query)
+            let totalCount: Int?
+            if bounds.offset == 0 {
+                totalCount = try Int.fetchOne(
+                    database,
+                    sql: """
+                        SELECT COUNT(*)
+                        FROM playlistItems
+                        LEFT JOIN tracks ON tracks.id = playlistItems.trackID
+                        WHERE playlistItems.playlistID = ? AND (\(search.clause))
+                        """,
+                    arguments: StatementArguments([playlistID]) + search.arguments
+                ) ?? 0
+            } else {
+                totalCount = nil
+            }
             var arguments = search.arguments
             arguments += [bounds.limit + 1, bounds.offset]
             let rows = try Row.fetchAll(
@@ -279,7 +294,8 @@ extension LibraryDatabase {
                 items: items,
                 offset: bounds.offset,
                 limit: bounds.limit,
-                hasMore: hasMore
+                hasMore: hasMore,
+                totalCount: totalCount
             )
         }
     }
