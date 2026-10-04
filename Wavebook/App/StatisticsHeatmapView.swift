@@ -4,13 +4,14 @@ import WavebookCore
 // GitHub-style fixed sunday-start year heatmap. At most 366 cells; each cell
 // carries an exact-count tooltip/accessibility label so color never carries
 // the play count alone.
-final class StatisticsHeatmapView: NSView {
+final class StatisticsHeatmapView: NSView, NSViewToolTipOwner {
     var onSelectDay: ((ListeningLocalDay?) -> Void)?
     var onFocusChanged: ((ListeningHeatmapDay?) -> Void)?
 
     private struct Cell {
         let rect: NSRect
         let entry: ListeningHeatmapDay
+        let dayIndex: Int
     }
 
     private static let pitch: CGFloat = 15
@@ -19,6 +20,7 @@ final class StatisticsHeatmapView: NSView {
     private static let leftInset: CGFloat = 2
     private var days: [ListeningHeatmapDay] = []
     private var cells: [Cell] = []
+    private var firstVisibleDayIndex = 0
     private struct MonthLabel {
         let text: String
         let point: NSPoint
@@ -26,6 +28,7 @@ final class StatisticsHeatmapView: NSView {
 
     private var fillPaths: [ListeningHeatmapBucket: NSBezierPath] = [:]
     private var monthLabels: [MonthLabel] = []
+    private var tooltipLabels: [NSView.ToolTipTag: String] = [:]
     private(set) var selectedDay: ListeningLocalDay?
     private var focusIndex: Int?
 
@@ -56,41 +59,28 @@ final class StatisticsHeatmapView: NSView {
 
     // MARK: Data
 
+    static func visibleStartIndex(in days: [ListeningHeatmapDay]) -> Int {
+        days.firstIndex(where: { $0.qualifiedPlayCount > 0 }) ?? days.count
+    }
+
     func reload(days: [ListeningHeatmapDay], selectedDay: ListeningLocalDay?) {
         self.days = days
         self.selectedDay = selectedDay
-        if let selectedDay, let index = days.firstIndex(where: { $0.day == selectedDay }) {
+        firstVisibleDayIndex = Self.visibleStartIndex(in: days)
+        if let selectedDay,
+           let index = days.firstIndex(where: { $0.day == selectedDay }),
+           index >= firstVisibleDayIndex {
             focusIndex = index
-        } else if let index = focusIndex, index >= days.count {
-            focusIndex = days.isEmpty ? nil : days.count - 1
+        } else if focusIndex.map({ $0 < firstVisibleDayIndex || !days.indices.contains($0) }) == true {
+            focusIndex = firstVisibleDayIndex < days.count ? firstVisibleDayIndex : nil
         }
         layoutCells()
         invalidateIntrinsicContentSize()
         notifyFocusChanged()
     }
-
-    private struct GridMetrics {
-        let leadingBlanks: Int
-        let columns: Int
-    }
-
-    private func gridMetrics() -> GridMetrics {
-        guard let first = days.first else { return GridMetrics(leadingBlanks: 0, columns: 0) }
-        let calendar = Calendar(identifier: .gregorian)
-        var components = DateComponents()
-        components.year = first.day.year
-        components.month = 1
-        components.day = 1
-        guard let januaryFirst = calendar.date(from: components) else {
-            return GridMetrics(leadingBlanks: 0, columns: 0)
-        }
-        // Fixed sunday-start layout: weekday 1 is Sunday.
-        let leadingBlanks = calendar.component(.weekday, from: januaryFirst) - 1
-        return GridMetrics(leadingBlanks: leadingBlanks, columns: (days.count + leadingBlanks + 6) / 7)
-    }
-
     private func layoutCells() {
         removeAllToolTips()
+        tooltipLabels.removeAll(keepingCapacity: true)
         cells.removeAll(keepingCapacity: true)
         fillPaths.removeAll(keepingCapacity: true)
         monthLabels.removeAll(keepingCapacity: true)
@@ -101,19 +91,21 @@ final class StatisticsHeatmapView: NSView {
         let metrics = gridMetrics()
         var lastLabeledColumn = -3
         for (index, entry) in days.enumerated() {
-            let slot = index + metrics.leadingBlanks
+            guard index >= firstVisibleDayIndex else { continue }
+            let slot = index + metrics.leadingBlanks - metrics.firstVisibleColumn * 7
             let rect = NSRect(
                 x: Self.leftInset + CGFloat(slot / 7) * Self.pitch,
                 y: Self.topInset + CGFloat(slot % 7) * Self.pitch,
                 width: Self.cellSize,
                 height: Self.cellSize
             )
-            cells.append(Cell(rect: rect, entry: entry))
+            cells.append(Cell(rect: rect, entry: entry, dayIndex: index))
             let fillPath = fillPaths[entry.bucket] ?? NSBezierPath()
             fillPath.appendRoundedRect(rect.insetBy(dx: 0.5, dy: 0.5), xRadius: 2.5, yRadius: 2.5)
             fillPaths[entry.bucket] = fillPath
-            addToolTip(rect, owner: label(for: entry), userData: nil)
-            guard entry.day.day == 1 else { continue }
+            let tooltipTag = addToolTip(rect, owner: self, userData: nil)
+            tooltipLabels[tooltipTag] = label(for: entry)
+            guard entry.day.day == 1 || index == firstVisibleDayIndex else { continue }
             let column = (Int(rect.minX) - Int(Self.leftInset)) / Int(Self.pitch)
             guard column - lastLabeledColumn >= 2 else { continue }
             lastLabeledColumn = column
@@ -127,6 +119,48 @@ final class StatisticsHeatmapView: NSView {
             )
         }
         needsDisplay = true
+    }
+
+    private struct GridMetrics {
+        let leadingBlanks: Int
+        let firstVisibleColumn: Int
+        let columns: Int
+    }
+
+    static func visibleGridMetrics(
+        dayCount: Int,
+        firstVisibleDayIndex: Int,
+        leadingBlanks: Int
+    ) -> (firstVisibleColumn: Int, columns: Int) {
+        guard firstVisibleDayIndex < dayCount else { return (0, 0) }
+        let firstVisibleColumn = (firstVisibleDayIndex + leadingBlanks) / 7
+        let totalColumns = (dayCount + leadingBlanks + 6) / 7
+        return (firstVisibleColumn, totalColumns - firstVisibleColumn)
+    }
+
+    private func gridMetrics() -> GridMetrics {
+        guard let first = days.first else {
+            return GridMetrics(leadingBlanks: 0, firstVisibleColumn: 0, columns: 0)
+        }
+        let calendar = Calendar(identifier: .gregorian)
+        var components = DateComponents()
+        components.year = first.day.year
+        components.month = 1
+        components.day = 1
+        guard let januaryFirst = calendar.date(from: components) else {
+            return GridMetrics(leadingBlanks: 0, firstVisibleColumn: 0, columns: 0)
+        }
+        let leadingBlanks = calendar.component(.weekday, from: januaryFirst) - 1
+        let visibleMetrics = Self.visibleGridMetrics(
+            dayCount: days.count,
+            firstVisibleDayIndex: firstVisibleDayIndex,
+            leadingBlanks: leadingBlanks
+        )
+        return GridMetrics(
+            leadingBlanks: leadingBlanks,
+            firstVisibleColumn: visibleMetrics.firstVisibleColumn,
+            columns: visibleMetrics.columns
+        )
     }
 
     // MARK: Drawing
@@ -165,7 +199,7 @@ final class StatisticsHeatmapView: NSView {
             fill(for: bucket).setFill()
             path.fill()
         }
-        for (index, cell) in cells.enumerated() {
+        for cell in cells {
             let rect = cell.rect.insetBy(dx: 0.5, dy: 0.5)
             if cell.entry.day == selectedDay {
                 AppTheme.primaryText.setStroke()
@@ -173,7 +207,7 @@ final class StatisticsHeatmapView: NSView {
                 path.lineWidth = 1.5
                 path.stroke()
             }
-            if index == focusIndex, window?.firstResponder === self {
+            if cell.dayIndex == focusIndex, window?.firstResponder === self {
                 AppTheme.accent.setStroke()
                 let path = NSBezierPath(roundedRect: rect.insetBy(dx: -2, dy: -2), xRadius: 3.5, yRadius: 3.5)
                 path.lineWidth = 1.5
@@ -202,13 +236,13 @@ final class StatisticsHeatmapView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
-        guard let index = cells.firstIndex(where: { $0.rect.contains(point) }) else { return }
+        guard let cell = cells.first(where: { $0.rect.contains(point) }) else { return }
         window?.makeFirstResponder(self)
-        select(index: index)
+        select(index: cell.dayIndex)
     }
 
     private func select(index: Int) {
-        guard days.indices.contains(index) else { return }
+        guard days.indices.contains(index), index >= firstVisibleDayIndex else { return }
         focusIndex = index
         let day = days[index].day
         selectedDay = selectedDay == day ? nil : day
@@ -218,7 +252,7 @@ final class StatisticsHeatmapView: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
-        guard let index = focusIndex, !days.isEmpty else {
+        guard let index = focusIndex, firstVisibleDayIndex < days.count else {
             interpretKeyEvents([event])
             return
         }
@@ -235,13 +269,13 @@ final class StatisticsHeatmapView: NSView {
     private func moveFocus(for specialKey: NSEvent.SpecialKey?, from index: Int) -> Bool {
         let target: Int
         switch specialKey {
-        case .leftArrow: target = max(index - 1, 0)
+        case .leftArrow: target = max(index - 1, firstVisibleDayIndex)
         case .rightArrow: target = min(index + 1, days.count - 1)
-        case .upArrow: target = max(index - 7, 0)
+        case .upArrow: target = max(index - 7, firstVisibleDayIndex)
         case .downArrow: target = min(index + 7, days.count - 1)
-        case .pageUp: target = max(index - 28 * 7, 0)
+        case .pageUp: target = max(index - 28 * 7, firstVisibleDayIndex)
         case .pageDown: target = min(index + 28 * 7, days.count - 1)
-        case .home: target = 0
+        case .home: target = firstVisibleDayIndex
         case .end: target = days.count - 1
         case .enter:
             select(index: index)
@@ -257,7 +291,10 @@ final class StatisticsHeatmapView: NSView {
     }
 
     override func becomeFirstResponder() -> Bool {
-        if focusIndex == nil { focusIndex = max(cells.count - 1, 0) }
+        if firstVisibleDayIndex < days.count,
+           focusIndex.map({ $0 >= firstVisibleDayIndex }) != true {
+            focusIndex = days.count - 1
+        }
         needsDisplay = true
         notifyFocusChanged()
         return true
@@ -270,6 +307,15 @@ final class StatisticsHeatmapView: NSView {
 
     private func notifyFocusChanged() {
         onFocusChanged?(focusIndex.flatMap { days.indices.contains($0) ? days[$0] : nil })
+    }
+
+    func view(
+        _ view: NSView,
+        stringForToolTip tag: NSView.ToolTipTag,
+        point: NSPoint,
+        userData data: UnsafeMutableRawPointer?
+    ) -> String {
+        tooltipLabels[tag] ?? ""
     }
 
     // MARK: Accessibility

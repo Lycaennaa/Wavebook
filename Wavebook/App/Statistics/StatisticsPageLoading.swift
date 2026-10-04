@@ -123,6 +123,9 @@ extension StatisticsPageViewController {
         guard let day else {
             dayTitleLabel.stringValue = ""
             daySummaryLabel.stringValue = ""
+            dayTitleLabel.isHidden = true
+            daySummaryLabel.isHidden = true
+            timelineStack.isHidden = true
             loadMoreButton.isHidden = true
             // The day snapshot replaced these with day-scoped data; restore
             // the year view that was showing before selection.
@@ -132,12 +135,17 @@ extension StatisticsPageViewController {
                 }
                 updateSkippedSection(yearSnapshot.skippedSongs)
             }
+            layoutRegions()
             return
         }
+        dayTitleLabel.isHidden = false
+        daySummaryLabel.isHidden = false
+        timelineStack.isHidden = false
         dayTitleLabel.stringValue = dateFormatter.string(
             from: dateFor(day: day)
         )
         daySummaryLabel.stringValue = "Loading…"
+        layoutRegions()
         refreshDayData()
         loadTimelinePage(cursor: nil)
     }
@@ -164,6 +172,7 @@ extension StatisticsPageViewController {
                     )
                 }
                 self.updateSkippedSection(snapshot.skippedSongs, dayScope: true)
+                self.layoutRegions()
             }
         }
         guard started else { return }

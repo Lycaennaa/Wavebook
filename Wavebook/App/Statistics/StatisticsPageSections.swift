@@ -40,13 +40,23 @@ extension StatisticsPageViewController {
             rankingSections[dimension] = section
             contentStack.addArrangedSubview(sectionTitle(Self.rankingTitle(dimension)))
             contentStack.addArrangedSubview(section)
+            constrainSectionToContentWidth(section)
         }
         let skipped = makeSkippedSection()
         skippedSection = skipped
         contentStack.addArrangedSubview(skipped.title)
         contentStack.addArrangedSubview(skipped.rows)
+        constrainSectionToContentWidth(skipped.rows)
         contentStack.addArrangedSubview(skipped.empty)
     }
+    private func constrainSectionToContentWidth(_ section: NSStackView) {
+        let edgeInsets = contentStack.edgeInsets
+        section.widthAnchor.constraint(
+            equalTo: contentStack.widthAnchor,
+            constant: -(edgeInsets.left + edgeInsets.right)
+        ).isActive = true
+    }
+
     override func loadView() {
         let root = StatisticsRootView()
         configureNavigationButtons()
@@ -107,9 +117,15 @@ extension StatisticsPageViewController {
         loadingIndicator.isHidden = true
         focusInfoLabel.font = .systemFont(ofSize: 11)
         focusInfoLabel.textColor = AppTheme.secondaryText
+        focusInfoLabel.isHidden = true
         heatmapView.onSelectDay = { [weak self] day in self?.selectDay(day) }
         heatmapView.onFocusChanged = { [weak self] entry in
-            self?.focusInfoLabel.stringValue = Self.focusDescription(entry)
+            guard let self else { return }
+            let isHidden = entry == nil
+            let visibilityChanged = self.focusInfoLabel.isHidden != isHidden
+            self.focusInfoLabel.stringValue = Self.focusDescription(entry)
+            self.focusInfoLabel.isHidden = isHidden
+            if visibilityChanged { self.layoutRegions() }
         }
         dayTitleLabel.font = .systemFont(ofSize: 15, weight: .semibold)
         dayTitleLabel.textColor = AppTheme.primaryText
@@ -118,6 +134,9 @@ extension StatisticsPageViewController {
         timelineStack.orientation = .vertical
         timelineStack.alignment = .leading
         timelineStack.spacing = 3
+        dayTitleLabel.isHidden = true
+        daySummaryLabel.isHidden = true
+        timelineStack.isHidden = true
     }
 
     private func configureContentStack() {
@@ -285,10 +304,12 @@ extension StatisticsPageViewController {
             let row = NSTextField(labelWithString: "")
             row.font = .systemFont(ofSize: 12)
             row.textColor = AppTheme.primaryText
+            row.alignment = .left
             row.lineBreakMode = .byTruncatingTail
             row.tag = index + 1
             row.isHidden = true
             stack.addArrangedSubview(row)
+            row.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
         return stack
     }
@@ -321,9 +342,11 @@ extension StatisticsPageViewController {
             let row = NSTextField(labelWithString: "")
             row.font = .systemFont(ofSize: 12)
             row.textColor = AppTheme.primaryText
+            row.alignment = .left
             row.lineBreakMode = .byTruncatingTail
             row.isHidden = true
             rows.addArrangedSubview(row)
+            row.widthAnchor.constraint(equalTo: rows.widthAnchor).isActive = true
         }
         let empty = bodyLabel("No skips recorded.")
         empty.isHidden = true
