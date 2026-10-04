@@ -5,7 +5,7 @@
     set -euo pipefail
     test "$(uname -s)" = Darwin
     xcode_output="$(xcodebuild -version)"
-    swift_output="$(swift --version)"
+    swift_output="$("$DEVELOPER_DIR/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift" --version)"
     printf '%s\n%s\n' "$xcode_output" "$swift_output"
     xcode_version="$(printf '%s\n' "$xcode_output" | python3 -c 'import sys; print(sys.stdin.readline().split()[1])')"
     swift_version="$(printf '%s\n' "$swift_output" | python3 -c 'import re, sys; match=re.search(r"Swift version ([0-9.]+)", sys.stdin.read()); print(match.group(1) if match else "")')"
@@ -53,9 +53,20 @@
     if command -v distill >/dev/null 2>&1; then distill swift lint -- --config .swiftlint.yml; else swiftlint lint --config .swiftlint.yml; fi
 
 @check-generated-project:
-    @if ! command -v xcodegen >/dev/null 2>&1; then printf 'XcodeGen 2.46.0 or later is required\n' >&2; exit 1; fi
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v xcodegen >/dev/null 2>&1; then printf 'XcodeGen 2.46.0 or later is required\n' >&2; exit 1; fi
+    mkdir -p .build
+    project_file="Wavebook.xcodeproj/project.pbxproj"
+    original_project="$(mktemp .build/project.pbxproj.XXXXXX)"
+    cp "$project_file" "$original_project"
+    trap 'rm -f "$original_project"' EXIT
     xcodegen generate --spec project.yml
-    git diff --exit-code -- Wavebook.xcodeproj
+    if ! cmp -s "$original_project" "$project_file"; then
+        diff -u "$original_project" "$project_file" || true
+        printf 'Generated project was out of date; review the regenerated project file\n' >&2
+        exit 1
+    fi
 
 @check-tooling:
     sh -n scripts/package-release.sh scripts/install-hooks.sh
@@ -64,9 +75,7 @@
 @ci:
     #!/usr/bin/env bash
     set -euo pipefail
-    if [[ -n "${WAVEBOOK_DEVELOPER_DIR:-}" ]]; then
-        export DEVELOPER_DIR="$WAVEBOOK_DEVELOPER_DIR"
-    fi
+    export DEVELOPER_DIR="${WAVEBOOK_DEVELOPER_DIR:-/Applications/Xcode16.4.app/Contents/Developer}"
     just check-ci-toolchain
     just check-generated-project
     just check-tooling
