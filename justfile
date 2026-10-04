@@ -1,6 +1,6 @@
 # Distill is a cli wrapper making it easier for humans and agents to use xcode/swift/cargo commands by showing only errors/warnings and other non noise. https://github.com/lycaennaa/distill
 
-check-ci-toolchain:
+@check-ci-toolchain:
     #!/usr/bin/env bash
     set -euo pipefail
     test "$(uname -s)" = Darwin
@@ -18,16 +18,17 @@ check-ci-toolchain:
         exit 1
     fi
 
-build:
+@build:
     if command -v distill >/dev/null 2>&1; then distill xcode build -- -scheme Wavebook -configuration Debug -derivedDataPath .build/debug CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto; else xcodebuild -project Wavebook.xcodeproj -scheme Wavebook -configuration Debug -derivedDataPath .build/debug CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto build; fi
 
-build-release:
+
+@build-release:
     if command -v distill >/dev/null 2>&1; then distill xcode build -- -scheme Wavebook -configuration Release -derivedDataPath .build/release CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto; else xcodebuild -project Wavebook.xcodeproj -scheme Wavebook -configuration Release -derivedDataPath .build/release CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto build; fi
 
-build-release-open:
+@build-release-open:
     if command -v distill >/dev/null 2>&1; then distill xcode build --open -- -scheme Wavebook -configuration Release -derivedDataPath .build/release CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto; else xcodebuild -project Wavebook.xcodeproj -scheme Wavebook -configuration Release -derivedDataPath .build/release CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto build && open .build/release/Build/Products/Release/*.app; fi
 
-test:
+@test:
     #!/usr/bin/env bash
     set -euo pipefail
     mkdir -p .build
@@ -39,28 +40,28 @@ test:
         xcodebuild -project Wavebook.xcodeproj -scheme WavebookTests -configuration Debug -derivedDataPath .build/test -resultBundlePath "$result_bundle" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto test
     fi
 
-package:
+@package:
     sh scripts/package-release.sh
 
-install-hooks:
+@install-hooks:
     sh scripts/install-hooks.sh
 
-check-pbx:
+@check-pbx:
     python3 -B scripts/check-pbx-identifiers.py
 
-lint:
+@lint:
     if command -v distill >/dev/null 2>&1; then distill swift lint -- --config .swiftlint.yml; else swiftlint lint --config .swiftlint.yml; fi
 
-check-generated-project:
+@check-generated-project:
     @if ! command -v xcodegen >/dev/null 2>&1; then printf 'XcodeGen 2.46.0 or later is required\n' >&2; exit 1; fi
     xcodegen generate --spec project.yml
     git diff --exit-code -- Wavebook.xcodeproj
 
-check-tooling:
+@check-tooling:
     sh -n scripts/package-release.sh scripts/install-hooks.sh
     python3 -B scripts/check-package-locks.py
 
-ci:
+@ci:
     #!/usr/bin/env bash
     set -euo pipefail
     if [[ -n "${WAVEBOOK_DEVELOPER_DIR:-}" ]]; then
