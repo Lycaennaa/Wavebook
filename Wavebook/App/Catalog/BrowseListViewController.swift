@@ -432,7 +432,7 @@ final class MarqueeLabel: NSView {
             needsDisplay = true
         }
         guard offset < overflow, timer == nil else { return }
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+        let scrollTimer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated {
                 guard let self else { return }
                 let overflow = self.textWidth - self.bounds.width
@@ -448,6 +448,8 @@ final class MarqueeLabel: NSView {
                 self.needsDisplay = true
             }
         }
+        timer = scrollTimer
+        RunLoop.main.add(scrollTimer, forMode: .common)
     }
 
     private var textWidth: CGFloat { currentRenderingCache().textWidth }
