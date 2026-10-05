@@ -134,14 +134,22 @@ final class PlayerBarView: ThemeBackgroundView {
         volumeSlider.widthAnchor.constraint(equalToConstant: 130).isActive = true
         let infoStack = NSStackView(views: [metadataStack, volumeStack])
         infoStack.orientation = .vertical
+        infoStack.alignment = .leading
         infoStack.spacing = 8
+        metadataStack.widthAnchor.constraint(equalTo: infoStack.widthAnchor).isActive = true
+        infoStack.setContentHuggingPriority(.defaultLow, for: .horizontal)
         let leftStack = NSStackView(views: [artworkView, infoStack, favoriteButton])
         leftStack.orientation = .horizontal
         leftStack.alignment = .centerY
+        leftStack.distribution = .fill
+        leftStack.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        controlsView.setContentHuggingPriority(.required, for: .horizontal)
         leftStack.spacing = 12
         let spacer = NSView()
+        spacer.widthAnchor.constraint(equalToConstant: 0).isActive = true
         let contentStack = NSStackView(views: [leftStack, spacer, controlsView])
         contentStack.orientation = .horizontal
+        contentStack.distribution = .fill
         contentStack.alignment = .centerY
         contentStack.spacing = 18
         let progressStack = NSStackView(views: [progressSlider, timeLabel])
@@ -159,6 +167,7 @@ final class PlayerBarView: ThemeBackgroundView {
             lyricsButton.heightAnchor.constraint(equalToConstant: 26),
             stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
             stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
+            contentStack.widthAnchor.constraint(equalTo: stack.widthAnchor),
             stack.centerYAnchor.constraint(equalTo: centerYAnchor)
         ])
     }
