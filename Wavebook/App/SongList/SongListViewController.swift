@@ -62,24 +62,7 @@ final class ActivatingCollectionView: NSCollectionView {
 
 final class SongListViewController: NSViewController, NSCollectionViewDataSource, NSCollectionViewDelegateFlowLayout {
     private static let maximumDisplayedTrackCount = PlaybackQueue.maximumEntryCount
-    var onPlay: ((Track) -> Void)?
-    var onAddToQueue: (([Track]) -> Void)?
-    var onAddNextToQueue: (([Track]) -> Void)?
-    var onDownloadLyrics: ((Track) -> Void)?
-    var onOpenLyricsInApp: ((Track, URL) -> Void)?
-    var onShowLyricsInFinder: ((Track) -> Void)?
-    var lyricsFileAvailabilityProvider: ((Track) -> Bool?)?
-    var onPrefetchLyricsFileAvailability: (([Track]) -> Void)?
-    var lyricsFileAvailabilityObserver: LyricsFileAvailabilityObserver?
-    var onManageSkipSegments: ((Track) -> Void)?
-    var onAlbumSelect: ((AlbumKey) -> Void)?
-    var onArtistSelect: ((String) -> Void)?
-    var onGenreSelect: ((String) -> Void)?
-    var onRescanLoudness: (([Track]) -> Void)?
-    var onToggleFavorite: (([Track]) -> Void)?
-    var manualPlaylists: [Playlist] = []
-    var onAddToPlaylist: (([Track], Int64) -> Void)?
-    var onRequestMore: (() -> Void)?
+    var actions = SongListActions()
     private var displayedTracks: [Track] = []
     private let collectionView = ActivatingCollectionView()
     private let artworkLoader = ArtworkImageLoader.shared
@@ -101,7 +84,7 @@ final class SongListViewController: NSViewController, NSCollectionViewDataSource
                 viewportHeight: scrollView.contentView.bounds.height,
                 visibleMaxY: scrollView.contentView.bounds.maxY
               ) else { return }
-        onRequestMore?()
+        actions.onRequestMore?()
     }
     private func scheduleMoreCheck() {
         DispatchQueue.main.async { [weak self] in
@@ -127,12 +110,12 @@ final class SongListViewController: NSViewController, NSCollectionViewDataSource
         collectionView.register(SongItem.self, forItemWithIdentifier: SongItem.identifier)
         collectionView.onActivateSelection = { [weak self] in
             guard let track = self?.selectedTrack else { return }
-            self?.onPlay?(track)
+            self?.actions.onPlay?(track)
         }
         configureContextMenu()
         collectionView.onDoubleClick = { [weak self] indexPath in
             guard let self, self.displayedTracks.indices.contains(indexPath.item) else { return }
-            self.onPlay?(self.displayedTracks[indexPath.item])
+            self.actions.onPlay?(self.displayedTracks[indexPath.item])
         }
         collectionView.onWindowChange = { [weak self] window in
             guard let self else { return }
@@ -175,23 +158,7 @@ final class SongListViewController: NSViewController, NSCollectionViewDataSource
             return makeTrackContextMenu(
                 tracks: tracks,
                 contextTrack: self.displayedTracks[clicked.item],
-                actions: TrackContextMenuActions(
-                    onAddToQueue: self.onAddToQueue,
-                    onAddNextToQueue: self.onAddNextToQueue,
-                    onDownloadLyrics: self.onDownloadLyrics,
-                    onOpenLyricsInApp: self.onOpenLyricsInApp,
-                    onShowLyricsInFinder: self.onShowLyricsInFinder,
-                    lyricsFileAvailabilityProvider: self.lyricsFileAvailabilityProvider,
-                    lyricsFileAvailabilityObserver: self.lyricsFileAvailabilityObserver,
-                    onManageSkipSegments: self.onManageSkipSegments,
-                    onAlbumSelect: self.onAlbumSelect,
-                    onArtistSelect: self.onArtistSelect,
-                    onGenreSelect: self.onGenreSelect,
-                    onRescanLoudness: self.onRescanLoudness,
-                    onToggleFavorite: self.onToggleFavorite,
-                    manualPlaylists: self.manualPlaylists,
-                    onAddToPlaylist: self.onAddToPlaylist
-                )
+                actions: self.actions.contextMenuActions
             )
         }
     }
@@ -250,7 +217,9 @@ final class SongListViewController: NSViewController, NSCollectionViewDataSource
         let request = artworkLoader.requestImage(forPath: track.path) { [weak item] image in
             item?.setArtwork(image)
         }
-        item.setFavoriteHandler { [weak self] in self?.onToggleFavorite?([track]) }
+        item.setFavoriteHandler { [weak self] in
+            self?.actions.contextMenuActions.onToggleFavorite?([track])
+        }
         item.configure(with: track, artwork: request.image)
         item.setArtworkRequest(request)
         return item
@@ -288,7 +257,7 @@ final class SongListViewController: NSViewController, NSCollectionViewDataSource
             ? Array(tracks.prefix(Self.maximumDisplayedTrackCount))
             : tracks
         displayedTracks = retainedTracks
-        onPrefetchLyricsFileAvailability?(retainedTracks)
+        actions.onPrefetchLyricsFileAvailability?(retainedTracks)
         self.hasMore = hasMore
             && retainedTracks.count == tracks.count
             && retainedTracks.count < Self.maximumDisplayedTrackCount
@@ -314,7 +283,7 @@ final class SongListViewController: NSViewController, NSCollectionViewDataSource
             ? Array(page.tracks.prefix(remaining))
             : page.tracks
         displayedTracks.append(contentsOf: appendedTracks)
-        onPrefetchLyricsFileAvailability?(appendedTracks)
+        actions.onPrefetchLyricsFileAvailability?(appendedTracks)
         hasMore = page.hasMore
             && appendedTracks.count == page.tracks.count
             && displayedTracks.count < Self.maximumDisplayedTrackCount

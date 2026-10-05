@@ -8,104 +8,12 @@ class FacetTracksPageViewController: NSViewController {
         case genres
     }
 
-    var onPlay: ((Track) -> Void)? {
-        get { trackList.onPlay }
-        set { trackList.onPlay = newValue }
-    }
-    var onAddToQueue: (([Track]) -> Void)? {
-        get { trackList.onAddToQueue }
-        set {
-            trackList.onAddToQueue = newValue
-            artistContentList.onAddToQueue = newValue
+    var actions = SongListActions() {
+        didSet {
+            trackList.actions = actions
+            artistContentList.actions = actions
         }
     }
-    var onAddNextToQueue: (([Track]) -> Void)? {
-        get { trackList.onAddNextToQueue }
-        set {
-            trackList.onAddNextToQueue = newValue
-            artistContentList.onAddNextToQueue = newValue
-        }
-    }
-    var onDownloadLyrics: ((Track) -> Void)? {
-        get { trackList.onDownloadLyrics }
-        set {
-            trackList.onDownloadLyrics = newValue
-            artistContentList.onDownloadLyrics = newValue
-        }
-    }
-    var onOpenLyricsInApp: ((Track, URL) -> Void)? {
-        get { trackList.onOpenLyricsInApp }
-        set {
-            trackList.onOpenLyricsInApp = newValue
-            artistContentList.onOpenLyricsInApp = newValue
-        }
-    }
-    var onShowLyricsInFinder: ((Track) -> Void)? {
-        get { trackList.onShowLyricsInFinder }
-        set {
-            trackList.onShowLyricsInFinder = newValue
-            artistContentList.onShowLyricsInFinder = newValue
-        }
-    }
-    var lyricsFileAvailabilityProvider: ((Track) -> Bool?)? {
-        get { trackList.lyricsFileAvailabilityProvider }
-        set {
-            trackList.lyricsFileAvailabilityProvider = newValue
-            artistContentList.lyricsFileAvailabilityProvider = newValue
-        }
-    }
-    var onPrefetchLyricsFileAvailability: (([Track]) -> Void)? {
-        get { trackList.onPrefetchLyricsFileAvailability }
-        set {
-            trackList.onPrefetchLyricsFileAvailability = newValue
-            artistContentList.onPrefetchLyricsFileAvailability = newValue
-        }
-    }
-    var lyricsFileAvailabilityObserver: LyricsFileAvailabilityObserver? {
-        get { trackList.lyricsFileAvailabilityObserver }
-        set {
-            trackList.lyricsFileAvailabilityObserver = newValue
-            artistContentList.lyricsFileAvailabilityObserver = newValue
-        }
-    }
-    var onManageSkipSegments: ((Track) -> Void)? {
-        get { trackList.onManageSkipSegments }
-        set {
-            trackList.onManageSkipSegments = newValue
-            artistContentList.onManageSkipSegments = newValue
-        }
-    }
-    var onRescanLoudness: (([Track]) -> Void)? {
-        get { trackList.onRescanLoudness }
-        set {
-            trackList.onRescanLoudness = newValue
-            artistContentList.onRescanLoudness = newValue
-        }
-    }
-    var onToggleFavorite: (([Track]) -> Void)? {
-        get { trackList.onToggleFavorite }
-        set {
-            trackList.onToggleFavorite = newValue
-            artistContentList.onToggleFavorite = newValue
-        }
-    }
-    var manualPlaylists: [Playlist] {
-        get { trackList.manualPlaylists }
-        set {
-            trackList.manualPlaylists = newValue
-            artistContentList.manualPlaylists = newValue
-        }
-    }
-    var onAddToPlaylist: (([Track], Int64) -> Void)? {
-        get { trackList.onAddToPlaylist }
-        set {
-            trackList.onAddToPlaylist = newValue
-            artistContentList.onAddToPlaylist = newValue
-        }
-    }
-    var onAlbumSelect: ((AlbumKey) -> Void)?
-    var onArtistSelect: ((String) -> Void)?
-    var onGenreSelect: ((String) -> Void)?
     var onSelectionChanged: (() -> Void)?
     var onRequestMoreFacets: (() -> Void)?
     var onRequestMoreDetails: (() -> Void)?
@@ -158,7 +66,7 @@ class FacetTracksPageViewController: NSViewController {
             detailStack: detailStack,
             documentView: documentView
         )
-        configureActions()
+        configureFacetListActions()
         view = stack
     }
 
@@ -439,33 +347,12 @@ extension FacetTracksPageViewController {
         ])
     }
 
-    private func configureActions() {
+    private func configureFacetListActions() {
         facetList.onSelect = { [weak self] index in
             self?.selectFacet(at: index)
         }
         facetList.onRequestMore = { [weak self] in
             self?.onRequestMoreFacets?()
-        }
-        trackList.onAlbumSelect = { [weak self] key in
-            self?.onAlbumSelect?(key)
-        }
-        trackList.onArtistSelect = { [weak self] artist in
-            self?.onArtistSelect?(artist)
-        }
-        trackList.onGenreSelect = { [weak self] genre in
-            self?.onGenreSelect?(genre)
-        }
-        artistContentList.onAlbumSelect = { [weak self] key in
-            self?.onAlbumSelect?(key)
-        }
-        artistContentList.onPlay = { [weak self] track in
-            self?.onPlay?(track)
-        }
-        artistContentList.onArtistSelect = { [weak self] artist in
-            self?.onArtistSelect?(artist)
-        }
-        artistContentList.onGenreSelect = { [weak self] genre in
-            self?.onGenreSelect?(genre)
         }
     }
 }

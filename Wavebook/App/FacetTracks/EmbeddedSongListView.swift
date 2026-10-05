@@ -2,23 +2,7 @@ import AppKit
 import WavebookCore
 
 final class EmbeddedSongListView: NSView, NSCollectionViewDataSource, NSCollectionViewDelegateFlowLayout {
-    var onPlay: ((Track) -> Void)?
-    var onAddToQueue: (([Track]) -> Void)?
-    var onAddNextToQueue: (([Track]) -> Void)?
-    var onDownloadLyrics: ((Track) -> Void)?
-    var onOpenLyricsInApp: ((Track, URL) -> Void)?
-    var onShowLyricsInFinder: ((Track) -> Void)?
-    var lyricsFileAvailabilityProvider: ((Track) -> Bool?)?
-    var onPrefetchLyricsFileAvailability: (([Track]) -> Void)?
-    var lyricsFileAvailabilityObserver: LyricsFileAvailabilityObserver?
-    var onManageSkipSegments: ((Track) -> Void)?
-    var onRescanLoudness: (([Track]) -> Void)?
-    var onToggleFavorite: (([Track]) -> Void)?
-    var manualPlaylists: [Playlist] = []
-    var onAddToPlaylist: (([Track], Int64) -> Void)?
-    var onAlbumSelect: ((AlbumKey) -> Void)?
-    var onArtistSelect: ((String) -> Void)?
-    var onGenreSelect: ((String) -> Void)?
+    var actions = SongListActions()
     private var displayedTracks: [Track] = []
     private let collectionView = ActivatingCollectionView()
     private let artworkLoader = ArtworkImageLoader.shared
@@ -42,7 +26,7 @@ final class EmbeddedSongListView: NSView, NSCollectionViewDataSource, NSCollecti
         configureContextMenu()
         collectionView.onDoubleClick = { [weak self] indexPath in
             guard let self, self.displayedTracks.indices.contains(indexPath.item) else { return }
-            self.onPlay?(self.displayedTracks[indexPath.item])
+            self.actions.onPlay?(self.displayedTracks[indexPath.item])
         }
         collectionView.onWindowChange = { [weak self] window in
             guard let self else { return }
@@ -73,23 +57,7 @@ final class EmbeddedSongListView: NSView, NSCollectionViewDataSource, NSCollecti
             return makeTrackContextMenu(
                 tracks: tracks,
                 contextTrack: self.displayedTracks[clicked.item],
-                actions: TrackContextMenuActions(
-                    onAddToQueue: self.onAddToQueue,
-                    onAddNextToQueue: self.onAddNextToQueue,
-                    onDownloadLyrics: self.onDownloadLyrics,
-                    onOpenLyricsInApp: self.onOpenLyricsInApp,
-                    onShowLyricsInFinder: self.onShowLyricsInFinder,
-                    lyricsFileAvailabilityProvider: self.lyricsFileAvailabilityProvider,
-                    lyricsFileAvailabilityObserver: self.lyricsFileAvailabilityObserver,
-                    onManageSkipSegments: self.onManageSkipSegments,
-                    onAlbumSelect: self.onAlbumSelect,
-                    onArtistSelect: self.onArtistSelect,
-                    onGenreSelect: self.onGenreSelect,
-                    onRescanLoudness: self.onRescanLoudness,
-                    onToggleFavorite: self.onToggleFavorite,
-                    manualPlaylists: self.manualPlaylists,
-                    onAddToPlaylist: self.onAddToPlaylist
-                )
+                actions: self.actions.contextMenuActions
             )
         }
     }
@@ -139,7 +107,7 @@ final class EmbeddedSongListView: NSView, NSCollectionViewDataSource, NSCollecti
         let selectedTracks = selectedTracks()
         cancelVisibleArtworkRequests()
         displayedTracks = tracks
-        onPrefetchLyricsFileAvailability?(tracks)
+        actions.onPrefetchLyricsFileAvailability?(tracks)
         collectionView.reloadData()
         restoreSelection(for: selectedTracks)
         heightConstraint?.constant = CGFloat(tracks.count * 80) + 24
@@ -174,7 +142,9 @@ final class EmbeddedSongListView: NSView, NSCollectionViewDataSource, NSCollecti
             item?.setArtwork(image)
         }
         item.configure(with: track, artwork: request.image)
-        item.setFavoriteHandler { [weak self] in self?.onToggleFavorite?([track]) }
+        item.setFavoriteHandler { [weak self] in
+            self?.actions.contextMenuActions.onToggleFavorite?([track])
+        }
         item.setArtworkRequest(request)
         return item
     }

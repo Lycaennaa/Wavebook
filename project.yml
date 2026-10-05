@@ -163,9 +163,12 @@ targets:
       - path: Wavebook/App/ThemeAwareViews.swift
       - path: Wavebook/App/Window/RootSplitView.swift
       - path: Wavebook/App/SongList/SongListViewController.swift
+      - path: Wavebook/App/SongList/SongListActions.swift
       - path: Wavebook/App/SongList/SongItem.swift
       - path: Wavebook/App/SongList/SongListContextMenu.swift
       - path: Wavebook/App/Catalog/BrowseListViewController.swift
+      - path: Wavebook/App/FacetTracks/ArtistCollectionItems.swift
+      - path: Wavebook/App/FacetTracks/ArtistContentListView.swift
       - path: Wavebook/App/Artwork
       - path: Wavebook/App/Catalog/SongsPageViewController.swift
       - path: Wavebook/App/Navigation/CatalogNavigationHost.swift

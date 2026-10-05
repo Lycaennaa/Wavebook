@@ -248,7 +248,7 @@ struct TrackContextMenuActions {
     let onGenreSelect: ((String) -> Void)?
     let onRescanLoudness: (([Track]) -> Void)?
     let onToggleFavorite: (([Track]) -> Void)?
-    let manualPlaylists: [Playlist]
+    var manualPlaylists: [Playlist]
     let onAddToPlaylist: (([Track], Int64) -> Void)?
     init(
         onAddToQueue: (([Track]) -> Void)? = nil,

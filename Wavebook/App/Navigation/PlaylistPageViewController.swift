@@ -451,12 +451,16 @@ private extension PlaylistPageViewController {
         renderContent()
     }
     func configureListCallbacks() {
-        liveSongList.onPlay = { [weak self] track in
-            self?.startPlaylistPlayback(startingAt: .track(track))
-        }
-        liveSongList.onRequestMore = { [weak self] in self?.loadMore() }
-        liveSongList.onToggleFavorite = { [weak self] tracks in self?.onToggleFavorite?(tracks) }
-        liveSongList.onManageSkipSegments = { [weak self] track in self?.onManageSkipSegments?(track) }
+        liveSongList.actions = SongListActions(
+            onPlay: { [weak self] track in
+                self?.startPlaylistPlayback(startingAt: .track(track))
+            },
+            contextMenuActions: TrackContextMenuActions(
+                onManageSkipSegments: { [weak self] track in self?.onManageSkipSegments?(track) },
+                onToggleFavorite: { [weak self] tracks in self?.onToggleFavorite?(tracks) }
+            ),
+            onRequestMore: { [weak self] in self?.loadMore() }
+        )
         manualItemList.onPlay = { [weak self] item in
             guard let self else { return }
             do {

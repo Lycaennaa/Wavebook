@@ -2,77 +2,9 @@ import AppKit
 import WavebookCore
 
 final class SongsPageViewController: NSViewController {
-    var onPlay: ((Track) -> Void)? {
-        get { songList.onPlay }
-        set { songList.onPlay = newValue }
-    }
-    var onAddToQueue: (([Track]) -> Void)? {
-        get { songList.onAddToQueue }
-        set { songList.onAddToQueue = newValue }
-    }
-    var onAddNextToQueue: (([Track]) -> Void)? {
-        get { songList.onAddNextToQueue }
-        set { songList.onAddNextToQueue = newValue }
-    }
-    var onDownloadLyrics: ((Track) -> Void)? {
-        get { songList.onDownloadLyrics }
-        set { songList.onDownloadLyrics = newValue }
-    }
-    var onOpenLyricsInApp: ((Track, URL) -> Void)? {
-        get { songList.onOpenLyricsInApp }
-        set { songList.onOpenLyricsInApp = newValue }
-    }
-    var onShowLyricsInFinder: ((Track) -> Void)? {
-        get { songList.onShowLyricsInFinder }
-        set { songList.onShowLyricsInFinder = newValue }
-    }
-    var lyricsFileAvailabilityProvider: ((Track) -> Bool?)? {
-        get { songList.lyricsFileAvailabilityProvider }
-        set { songList.lyricsFileAvailabilityProvider = newValue }
-    }
-    var onPrefetchLyricsFileAvailability: (([Track]) -> Void)? {
-        get { songList.onPrefetchLyricsFileAvailability }
-        set { songList.onPrefetchLyricsFileAvailability = newValue }
-    }
-    var lyricsFileAvailabilityObserver: LyricsFileAvailabilityObserver? {
-        get { songList.lyricsFileAvailabilityObserver }
-        set { songList.lyricsFileAvailabilityObserver = newValue }
-    }
-    var onManageSkipSegments: ((Track) -> Void)? {
-        get { songList.onManageSkipSegments }
-        set { songList.onManageSkipSegments = newValue }
-    }
-    var onRescanLoudness: (([Track]) -> Void)? {
-        get { songList.onRescanLoudness }
-        set { songList.onRescanLoudness = newValue }
-    }
-    var onToggleFavorite: (([Track]) -> Void)? {
-        get { songList.onToggleFavorite }
-        set { songList.onToggleFavorite = newValue }
-    }
-    var manualPlaylists: [Playlist] {
-        get { songList.manualPlaylists }
-        set { songList.manualPlaylists = newValue }
-    }
-    var onAddToPlaylist: (([Track], Int64) -> Void)? {
-        get { songList.onAddToPlaylist }
-        set { songList.onAddToPlaylist = newValue }
-    }
-    var onAlbumSelect: ((AlbumKey) -> Void)? {
-        get { songList.onAlbumSelect }
-        set { songList.onAlbumSelect = newValue }
-    }
-    var onArtistSelect: ((String) -> Void)? {
-        get { songList.onArtistSelect }
-        set { songList.onArtistSelect = newValue }
-    }
-    var onGenreSelect: ((String) -> Void)? {
-        get { songList.onGenreSelect }
-        set { songList.onGenreSelect = newValue }
-    }
-    var onRequestMore: (() -> Void)? {
-        get { songList.onRequestMore }
-        set { songList.onRequestMore = newValue }
+    var actions: SongListActions {
+        get { songList.actions }
+        set { songList.actions = newValue }
     }
 
     private let songList = SongListViewController()

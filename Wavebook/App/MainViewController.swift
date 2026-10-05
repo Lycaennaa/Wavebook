@@ -345,19 +345,10 @@ extension MainViewController {
     }
 
     private func configurePlaybackAndNavigationCallbacks(_ lyricsCallbacks: MainPageLyricsCallbacks) {
-        songsPage.onPlay = { [weak self] track in _ = self?.playbackSession.queue.play(track) }
-        artistsPage.onPlay = { [weak self] track in
-            _ = self?.playTrackWithinCatalogContext(track)
-        }
-        albumsPage.onPlay = { [weak self] track in
-            _ = self?.playTrackWithinCatalogContext(track)
-        }
-        genresPage.onPlay = { [weak self] track in _ = self?.playbackSession.queue.play(track) }
         searchPage.onPlay = { [weak self] track in _ = self?.playbackSession.queue.play(track) }
         searchPage.onAlbumSelect = { [weak self] key in self?.openAlbum(key) }
         searchPage.onArtistSelect = { [weak self] artist in self?.openArtist(artist) }
         searchPage.onGenreSelect = { [weak self] genre in self?.openGenre(genre) }
-        songsPage.onRequestMore = { [weak self] in self?.navigation.loadMore(kind: .page) }
         statisticsPage.databaseProvider = { [weak self] in self?.database }
         statisticsPage.trackerProvider = { [weak self] in self?.playbackSession.history.tracker }
         statisticsPage.renderedPositionProvider = { [weak self] in self?.playbackSession.history.renderedPosition }
@@ -394,29 +385,52 @@ extension MainViewController {
     }
 
     private func configureCatalogPages(_ lyricsCallbacks: MainPageLyricsCallbacks) {
-        let catalogPages: [FacetTracksPageViewController] = [artistsPage, albumsPage, genresPage]
-        catalogPages.forEach { configureCatalogPageCallbacks($0, lyricsCallbacks: lyricsCallbacks) }
-        albumsPage.onRescanLoudness = { [weak self] _ in self?.rescanSelectedAlbumLoudness() }
+        let playWithinCatalogContext: (Track) -> Void = { [weak self] track in
+            _ = self?.playTrackWithinCatalogContext(track)
+        }
+        configureCatalogPageCallbacks(
+            artistsPage,
+            lyricsCallbacks: lyricsCallbacks,
+            onPlay: playWithinCatalogContext
+        )
+        configureCatalogPageCallbacks(
+            albumsPage,
+            lyricsCallbacks: lyricsCallbacks,
+            onPlay: playWithinCatalogContext,
+            onRescanLoudness: { [weak self] _ in self?.rescanSelectedAlbumLoudness() }
+        )
+        configureCatalogPageCallbacks(
+            genresPage,
+            lyricsCallbacks: lyricsCallbacks,
+            onPlay: { [weak self] track in _ = self?.playbackSession.queue.play(track) }
+        )
     }
 
     private func configureSongsAndPlaylistCallbacks(_ lyricsCallbacks: MainPageLyricsCallbacks) {
-        songsPage.onAddToQueue = { [weak self] tracks in self?.playbackSession.queue.addToQueue(tracks) }
-        songsPage.onAddNextToQueue = { [weak self] tracks in self?.playbackSession.queue.addNextToQueue(tracks) }
-        songsPage.onDownloadLyrics = { [weak self] track in self?.showLyricsDownloadDialog(for: track) }
-        songsPage.onOpenLyricsInApp = lyricsCallbacks.openInApp
-        songsPage.onShowLyricsInFinder = lyricsCallbacks.showInFinder
-        songsPage.lyricsFileAvailabilityProvider = lyricsCallbacks.fileAvailability
-        songsPage.onPrefetchLyricsFileAvailability = lyricsCallbacks.prefetchFileAvailability
-        songsPage.lyricsFileAvailabilityObserver = lyricsCallbacks.observeFileAvailability
-        songsPage.onManageSkipSegments = { [weak self] track in self?.manageSkipSegments(for: track) }
-        songsPage.onRescanLoudness = { [weak self] tracks in self?.replayGainAnalysis.rescanLoudness(for: tracks) }
-        songsPage.onAlbumSelect = { [weak self] key in self?.openAlbum(key) }
-        songsPage.onArtistSelect = { [weak self] artist in self?.openArtist(artist) }
-        songsPage.onGenreSelect = { [weak self] genre in self?.openGenre(genre) }
-        songsPage.onToggleFavorite = { [weak self] tracks in self?.toggleFavorites(tracks) }
-        songsPage.onAddToPlaylist = { [weak self] tracks, playlistID in
-            self?.addTracks(tracks, toPlaylistID: playlistID)
-        }
+        songsPage.actions = SongListActions(
+            onPlay: { [weak self] track in _ = self?.playbackSession.queue.play(track) },
+            contextMenuActions: TrackContextMenuActions(
+                onAddToQueue: { [weak self] tracks in self?.playbackSession.queue.addToQueue(tracks) },
+                onAddNextToQueue: { [weak self] tracks in self?.playbackSession.queue.addNextToQueue(tracks) },
+                onDownloadLyrics: { [weak self] track in self?.showLyricsDownloadDialog(for: track) },
+                onOpenLyricsInApp: lyricsCallbacks.openInApp,
+                onShowLyricsInFinder: lyricsCallbacks.showInFinder,
+                lyricsFileAvailabilityProvider: lyricsCallbacks.fileAvailability,
+                lyricsFileAvailabilityObserver: lyricsCallbacks.observeFileAvailability,
+                onManageSkipSegments: { [weak self] track in self?.manageSkipSegments(for: track) },
+                onAlbumSelect: { [weak self] key in self?.openAlbum(key) },
+                onArtistSelect: { [weak self] artist in self?.openArtist(artist) },
+                onGenreSelect: { [weak self] genre in self?.openGenre(genre) },
+                onRescanLoudness: { [weak self] tracks in self?.replayGainAnalysis.rescanLoudness(for: tracks) },
+                onToggleFavorite: { [weak self] tracks in self?.toggleFavorites(tracks) },
+                manualPlaylists: songsPage.actions.contextMenuActions.manualPlaylists,
+                onAddToPlaylist: { [weak self] tracks, playlistID in
+                    self?.addTracks(tracks, toPlaylistID: playlistID)
+                }
+            ),
+            onPrefetchLyricsFileAvailability: lyricsCallbacks.prefetchFileAvailability,
+            onRequestMore: { [weak self] in self?.navigation.loadMore(kind: .page) }
+        )
         playlistsPage.onPlaylistMutation = { [weak self] in self?.refreshPlaylistCatalog() }
         playlistsPage.onToggleFavorite = { [weak self] tracks in self?.toggleFavorites(tracks) }
         playlistsPage.onManageSkipSegments = { [weak self] track in self?.manageSkipSegments(for: track) }
@@ -433,26 +447,35 @@ extension MainViewController {
 
     private func configureCatalogPageCallbacks(
         _ page: FacetTracksPageViewController,
-        lyricsCallbacks: MainPageLyricsCallbacks
+        lyricsCallbacks: MainPageLyricsCallbacks,
+        onPlay: @escaping (Track) -> Void,
+        onRescanLoudness: (([Track]) -> Void)? = nil
     ) {
-        page.onOpenLyricsInApp = lyricsCallbacks.openInApp
-        page.onShowLyricsInFinder = lyricsCallbacks.showInFinder
-        page.lyricsFileAvailabilityProvider = lyricsCallbacks.fileAvailability
-        page.onPrefetchLyricsFileAvailability = lyricsCallbacks.prefetchFileAvailability
-        page.lyricsFileAvailabilityObserver = lyricsCallbacks.observeFileAvailability
-        page.onAddToQueue = { [weak self] tracks in self?.playbackSession.queue.addToQueue(tracks) }
-        page.onAddNextToQueue = { [weak self] tracks in self?.playbackSession.queue.addNextToQueue(tracks) }
-        page.onDownloadLyrics = { [weak self] track in self?.showLyricsDownloadDialog(for: track) }
-        page.onManageSkipSegments = { [weak self] track in self?.manageSkipSegments(for: track) }
-        page.onRescanLoudness = { [weak self] tracks in self?.replayGainAnalysis.rescanLoudness(for: tracks) }
-        page.onAlbumSelect = { [weak self] key in self?.openAlbum(key) }
-        page.onArtistSelect = { [weak self] artist in self?.openArtist(artist) }
-        page.onGenreSelect = { [weak self] genre in self?.openGenre(genre) }
-        page.onToggleFavorite = { [weak self] tracks in self?.toggleFavorites(tracks) }
-        page.manualPlaylists = songsPage.manualPlaylists
-        page.onAddToPlaylist = { [weak self] tracks, playlistID in
-            self?.addTracks(tracks, toPlaylistID: playlistID)
-        }
+        page.actions = SongListActions(
+            onPlay: onPlay,
+            contextMenuActions: TrackContextMenuActions(
+                onAddToQueue: { [weak self] tracks in self?.playbackSession.queue.addToQueue(tracks) },
+                onAddNextToQueue: { [weak self] tracks in self?.playbackSession.queue.addNextToQueue(tracks) },
+                onDownloadLyrics: { [weak self] track in self?.showLyricsDownloadDialog(for: track) },
+                onOpenLyricsInApp: lyricsCallbacks.openInApp,
+                onShowLyricsInFinder: lyricsCallbacks.showInFinder,
+                lyricsFileAvailabilityProvider: lyricsCallbacks.fileAvailability,
+                lyricsFileAvailabilityObserver: lyricsCallbacks.observeFileAvailability,
+                onManageSkipSegments: { [weak self] track in self?.manageSkipSegments(for: track) },
+                onAlbumSelect: { [weak self] key in self?.openAlbum(key) },
+                onArtistSelect: { [weak self] artist in self?.openArtist(artist) },
+                onGenreSelect: { [weak self] genre in self?.openGenre(genre) },
+                onRescanLoudness: onRescanLoudness ?? { [weak self] tracks in
+                    self?.replayGainAnalysis.rescanLoudness(for: tracks)
+                },
+                onToggleFavorite: { [weak self] tracks in self?.toggleFavorites(tracks) },
+                manualPlaylists: songsPage.actions.contextMenuActions.manualPlaylists,
+                onAddToPlaylist: { [weak self] tracks, playlistID in
+                    self?.addTracks(tracks, toPlaylistID: playlistID)
+                }
+            ),
+            onPrefetchLyricsFileAvailability: lyricsCallbacks.prefetchFileAvailability
+        )
         page.onSelectionChanged = { [weak self] in self?.navigation.reloadCurrentPage() }
         page.onRequestMoreFacets = { [weak self] in self?.navigation.loadMore(kind: .facets) }
         page.onRequestMoreDetails = { [weak self] in self?.navigation.loadMore(kind: .details) }

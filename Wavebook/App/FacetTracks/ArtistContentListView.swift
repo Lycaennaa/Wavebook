@@ -2,23 +2,7 @@ import AppKit
 import WavebookCore
 
 final class ArtistContentListView: NSView, NSCollectionViewDataSource, NSCollectionViewDelegateFlowLayout {
-    var onPlay: ((Track) -> Void)?
-    var onAlbumSelect: ((AlbumKey) -> Void)?
-    var onArtistSelect: ((String) -> Void)?
-    var onGenreSelect: ((String) -> Void)?
-    var onAddToQueue: (([Track]) -> Void)?
-    var onAddNextToQueue: (([Track]) -> Void)?
-    var onDownloadLyrics: ((Track) -> Void)?
-    var onOpenLyricsInApp: ((Track, URL) -> Void)?
-    var onShowLyricsInFinder: ((Track) -> Void)?
-    var lyricsFileAvailabilityProvider: ((Track) -> Bool?)?
-    var onPrefetchLyricsFileAvailability: (([Track]) -> Void)?
-    var lyricsFileAvailabilityObserver: LyricsFileAvailabilityObserver?
-    var onManageSkipSegments: ((Track) -> Void)?
-    var onRescanLoudness: (([Track]) -> Void)?
-    var onToggleFavorite: (([Track]) -> Void)?
-    var manualPlaylists: [Playlist] = []
-    var onAddToPlaylist: (([Track], Int64) -> Void)?
+    var actions = SongListActions()
 
     private enum Row {
         case header(String)
@@ -80,30 +64,14 @@ final class ArtistContentListView: NSView, NSCollectionViewDataSource, NSCollect
             return makeTrackContextMenu(
                 tracks: tracks,
                 contextTrack: lyricsTrack,
-                actions: TrackContextMenuActions(
-                    onAddToQueue: self.onAddToQueue,
-                    onAddNextToQueue: self.onAddNextToQueue,
-                    onDownloadLyrics: self.onDownloadLyrics,
-                    onOpenLyricsInApp: self.onOpenLyricsInApp,
-                    onShowLyricsInFinder: self.onShowLyricsInFinder,
-                    lyricsFileAvailabilityProvider: self.lyricsFileAvailabilityProvider,
-                    lyricsFileAvailabilityObserver: self.lyricsFileAvailabilityObserver,
-                    onManageSkipSegments: self.onManageSkipSegments,
-                    onAlbumSelect: self.onAlbumSelect,
-                    onArtistSelect: self.onArtistSelect,
-                    onGenreSelect: self.onGenreSelect,
-                    onRescanLoudness: self.onRescanLoudness,
-                    onToggleFavorite: self.onToggleFavorite,
-                    manualPlaylists: self.manualPlaylists,
-                    onAddToPlaylist: self.onAddToPlaylist
-                )
+                actions: self.actions.contextMenuActions
             )
         }
         collectionView.onDoubleClick = { [weak self] indexPath in
             guard let self,
                   self.rows.indices.contains(indexPath.item),
                   case let .track(track) = self.rows[indexPath.item] else { return }
-            self.onPlay?(track)
+            self.actions.onPlay?(track)
         }
         collectionView.onWindowChange = { [weak self] window in
             guard let self else { return }
@@ -177,7 +145,7 @@ final class ArtistContentListView: NSView, NSCollectionViewDataSource, NSCollect
         cancelVisibleArtworkRequests()
 
         displayedTracks = tracks
-        onPrefetchLyricsFileAvailability?(tracks)
+        actions.onPrefetchLyricsFileAvailability?(tracks)
         rows = []
         if let detail {
             if !detail.genres.isEmpty {
@@ -208,7 +176,7 @@ final class ArtistContentListView: NSView, NSCollectionViewDataSource, NSCollect
         cancelVisibleArtworkRequests()
 
         displayedTracks = tracks
-        onPrefetchLyricsFileAvailability?(tracks)
+        actions.onPrefetchLyricsFileAvailability?(tracks)
         rows = []
         let artists = Array(Set(tracks.flatMap { track -> [String] in
             let artists = track.artists
@@ -268,7 +236,9 @@ final class ArtistContentListView: NSView, NSCollectionViewDataSource, NSCollect
                 for: indexPath
             ) as? ArtistNamesItem else { return NSCollectionViewItem() }
             item.configure(artists)
-            item.onArtistSelect = { [weak self] artist in self?.onArtistSelect?(artist) }
+            item.onArtistSelect = { [weak self] artist in
+                self?.actions.contextMenuActions.onArtistSelect?(artist)
+            }
             return item
         case let .album(album):
             guard let item = collectionView.makeItem(
@@ -292,7 +262,9 @@ final class ArtistContentListView: NSView, NSCollectionViewDataSource, NSCollect
                 item?.setArtwork(image)
             }
             item.configure(with: track, artwork: request.image)
-            item.setFavoriteHandler { [weak self] in self?.onToggleFavorite?([track]) }
+            item.setFavoriteHandler { [weak self] in
+                self?.actions.contextMenuActions.onToggleFavorite?([track])
+            }
             item.setArtworkRequest(request)
             return item
         }
@@ -311,7 +283,9 @@ final class ArtistContentListView: NSView, NSCollectionViewDataSource, NSCollect
 
     func collectionView(_ collectionView: NSCollectionView, didSelectItemsAt indexPaths: Set<IndexPath>) {
         guard let index = indexPaths.first?.item, rows.indices.contains(index) else { return }
-        if case let .album(album) = rows[index] { onAlbumSelect?(album.key) }
+        if case let .album(album) = rows[index] {
+            actions.contextMenuActions.onAlbumSelect?(album.key)
+        }
     }
 
     private func height(for row: Row) -> CGFloat {

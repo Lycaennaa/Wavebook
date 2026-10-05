@@ -39,9 +39,9 @@ extension MainViewController {
         do {
             let playlists = try database.playlists()
             let manualPlaylists = playlists.filter { $0.kind == .manual }
-            songsPage.manualPlaylists = manualPlaylists
+            songsPage.actions.contextMenuActions.manualPlaylists = manualPlaylists
             [artistsPage, albumsPage, genresPage].forEach {
-                $0.manualPlaylists = manualPlaylists
+                $0.actions.contextMenuActions.manualPlaylists = manualPlaylists
             }
             onPlaylistCatalogChanged?(playlists)
         } catch {
