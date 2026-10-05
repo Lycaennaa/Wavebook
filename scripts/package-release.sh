@@ -8,7 +8,7 @@ PACKAGE_NAME=${APP_NAME:-}
 BUNDLE_IDENTIFIER=${BUNDLE_IDENTIFIER:-com.lycaennaa.wavebook}
 VERSION=${VERSION:-}
 DIST_DIR=${DIST_DIR:-$ROOT/dist}
-DERIVED_DATA=${DERIVED_DATA:-$ROOT/.build/package-derived-data}
+DERIVED_DATA=${DERIVED_DATA:-$ROOT/.build/derived-data}
 ADHOC_SIGN=${ADHOC_SIGN:-YES}
 STRIP_RELEASE=${STRIP_RELEASE:-NO}
 
@@ -107,9 +107,6 @@ cleanup() {
             status=1
         fi
     fi
-    if ! rm -rf "$DERIVED_DATA" && [ "$status" -eq 0 ]; then
-        status=1
-    fi
     exit "$status"
 }
 trap cleanup EXIT
@@ -117,14 +114,14 @@ trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-rm -rf "$DERIVED_DATA"
-mkdir -p "$DERIVED_DATA" "$DIST_DIR"
+mkdir -p "$DERIVED_DATA" "$DIST_DIR" "$ROOT/.build/derived-data/SourcePackages"
 
 xcodebuild \
     -project "$PROJECT_PATH" \
     -configuration "$CONFIGURATION" \
     -scheme "$SCHEME" \
     -derivedDataPath "$DERIVED_DATA" \
+    -clonedSourcePackagesDirPath "$ROOT/.build/derived-data/SourcePackages" \
     "APP_BUNDLE_IDENTIFIER=$BUNDLE_IDENTIFIER" \
     CODE_SIGNING_ALLOWED=NO \
     CODE_SIGNING_REQUIRED=NO \
@@ -194,6 +191,10 @@ case "$VERSION" in
         exit 2
         ;;
 esac
+OUTPUT_DIR=$(mktemp -d "$DIST_DIR/.package-output.XXXXXX")
+STAGED_APP_PATH=$OUTPUT_DIR/$BUILT_APP_NAME.app
+ditto "$APP_PATH" "$STAGED_APP_PATH"
+APP_PATH=$STAGED_APP_PATH
 
 EXECUTABLE_PATH=$APP_PATH/Contents/MacOS/$BUILT_APP_NAME
 if [ ! -f "$EXECUTABLE_PATH" ]; then
@@ -251,7 +252,6 @@ for output in "$ZIP_PATH" "$CHECKSUM_PATH"; do
     fi
 done
 
-OUTPUT_DIR=$(mktemp -d "$DIST_DIR/.package-output.XXXXXX")
 ZIP_TEMP=$OUTPUT_DIR/$PACKAGE_NAME-$VERSION.zip
 ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_TEMP"
 python3 -B "$ROOT/scripts/check-release-privacy.py" "$ZIP_TEMP" "$ROOT" "$BUNDLE_IDENTIFIER"

@@ -19,26 +19,32 @@
     fi
 
 @build:
-    if command -v distill >/dev/null 2>&1; then distill xcode build -- -scheme Wavebook -configuration Debug -derivedDataPath .build/debug CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto; else xcodebuild -project Wavebook.xcodeproj -scheme Wavebook -configuration Debug -derivedDataPath .build/debug CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto build; fi
+    if command -v distill >/dev/null 2>&1; then distill xcode build -- -scheme Wavebook -configuration Debug -derivedDataPath .build/derived-data CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto; else xcodebuild -project Wavebook.xcodeproj -scheme Wavebook -configuration Debug -derivedDataPath .build/derived-data CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto build; fi
 
 
 @build-release:
-    if command -v distill >/dev/null 2>&1; then distill xcode build -- -scheme Wavebook -configuration Release -derivedDataPath .build/release CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto; else xcodebuild -project Wavebook.xcodeproj -scheme Wavebook -configuration Release -derivedDataPath .build/release CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto build; fi
+    if command -v distill >/dev/null 2>&1; then distill xcode build -- -scheme Wavebook -configuration Release -derivedDataPath .build/derived-data CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto; else xcodebuild -project Wavebook.xcodeproj -scheme Wavebook -configuration Release -derivedDataPath .build/derived-data CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto build; fi
 
 @build-release-open:
-    if command -v distill >/dev/null 2>&1; then distill xcode build --open -- -scheme Wavebook -configuration Release -derivedDataPath .build/release CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto; else xcodebuild -project Wavebook.xcodeproj -scheme Wavebook -configuration Release -derivedDataPath .build/release CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto build && open .build/release/Build/Products/Release/*.app; fi
+    if command -v distill >/dev/null 2>&1; then distill xcode build --open -- -scheme Wavebook -configuration Release -derivedDataPath .build/derived-data CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto; else xcodebuild -project Wavebook.xcodeproj -scheme Wavebook -configuration Release -derivedDataPath .build/derived-data CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto build && open .build/derived-data/Build/Products/Release/*.app; fi
 
 @test:
     #!/usr/bin/env bash
     set -euo pipefail
     mkdir -p .build
-    result_bundle=".build/test-$(date +%Y%m%d-%H%M%S).xcresult"
-    printf 'XCTest result bundle: %s\n' "$result_bundle"
+    result_bundle=".build/test-results.xcresult"
+    rm -rf "$result_bundle"
+    printf 'XCTest result bundle retained on failure: %s\n' "$result_bundle"
+    status=0
     if command -v distill >/dev/null 2>&1; then
-        distill xcode test -- -scheme WavebookTests -configuration Debug -derivedDataPath .build/test -resultBundlePath "$result_bundle" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto
+        distill xcode test -- -scheme WavebookTests -configuration Debug -derivedDataPath .build/derived-data -resultBundlePath "$result_bundle" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto || status=$?
     else
-        xcodebuild -project Wavebook.xcodeproj -scheme WavebookTests -configuration Debug -derivedDataPath .build/test -resultBundlePath "$result_bundle" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto test
+        xcodebuild -project Wavebook.xcodeproj -scheme WavebookTests -configuration Debug -derivedDataPath .build/derived-data -resultBundlePath "$result_bundle" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO SDKROOT=auto test || status=$?
     fi
+    if [[ "$status" -eq 0 ]]; then
+        rm -rf "$result_bundle"
+    fi
+    exit "$status"
 
 @package:
     sh scripts/package-release.sh

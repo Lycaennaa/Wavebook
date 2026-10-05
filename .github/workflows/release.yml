@@ -126,11 +126,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/.build/derived-data/SourcePackages"
           xcodebuild \
             -project Wavebook.xcodeproj \
             -scheme WavebookTests \
             -configuration Debug \
-            -derivedDataPath "$RUNNER_TEMP/wavebook-release-tests" \
+            -derivedDataPath "$GITHUB_WORKSPACE/.build/derived-data" \
+            -clonedSourcePackagesDirPath "$GITHUB_WORKSPACE/.build/derived-data/SourcePackages" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             SDKROOT=auto \

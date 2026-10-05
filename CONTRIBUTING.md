@@ -46,7 +46,7 @@ WAVEBOOK_DEVELOPER_DIR="/Applications/Xcode16.4.app/Contents/Developer" just ci
 
 Xcode 16.4 can be downloaded at https://developer.apple.com/download/all.
 
-The normal development requirement remains Xcode 26.6 or later; the older Xcode selection is specifically for reproducing the current Actions runner. `just ci` also regenerates and verifies the project, checks repository tooling, runs tests, and builds Release. `just test` writes an `.xcresult` bundle under `.build`; inspect crash attachments with `xcrun xcresulttool export attachments --path <bundle> --output-path .build/test-attachments --only-failures`. Update the pinned local versions when CI's toolchain changes. `project.yml`'s `xcodeVersion` is XcodeGen metadata, not a toolchain selector.
+The local `just build`, `just build-release`, and `just test` recipes reuse `.build/derived-data`, including its SwiftPM checkout and module caches, avoiding duplicate package clones. Local packaging reuses those Release products and stages its signed/stripped app copy outside the cache. `just test` removes its result bundle after a successful run and retains `.build/test-results.xcresult` on failure for crash diagnostics. Remove `.build/derived-data` when no build is running to reclaim space; delete the failure result after exporting needed attachments. The release workflow shares DerivedData between tests and packaging. Update the pinned local versions when CI's toolchain changes. `project.yml`'s `xcodeVersion` is XcodeGen metadata, not a toolchain selector.
 
 ## Change expectations
 

@@ -29,7 +29,7 @@ For parity with the current GitHub Actions toolchain, run:
 WAVEBOOK_DEVELOPER_DIR="/Applications/Xcode16.4.app/Contents/Developer" just ci
 ```
 
-`WAVEBOOK_DEVELOPER_DIR` must point to Xcode's `Contents/Developer` directory. `just ci` checks exact Xcode/Swift versions, regenerates and verifies the project, validates repository tooling, runs tests, and builds Release. `just test` saves an `.xcresult` under `.build`; export crash attachments with `xcrun xcresulttool export attachments --path <bundle> --output-path .build/test-attachments --only-failures`. Update the version check when CI's toolchain changes. `project.yml`'s `xcodeVersion` controls generated project metadata; it does not select the compiler.
+`WAVEBOOK_DEVELOPER_DIR` must point to Xcode's `Contents/Developer` directory. `just ci` checks exact Xcode/Swift versions, regenerates and verifies the project, validates repository tooling, runs tests, and builds Release. `just test` retains `.build/test-results.xcresult` only when tests fail; export crash attachments with `xcrun xcresulttool export attachments --path .build/test-results.xcresult --output-path .build/test-attachments --only-failures`. Update the version check when CI's toolchain changes. `project.yml`'s `xcodeVersion` controls generated project metadata; it does not select the compiler.
 
 For project changes, edit `project.yml`, run `xcodegen generate --spec project.yml`, and review generated diff; never hand-edit `Wavebook.xcodeproj`. Keep context-specific SwiftPM lockfile pins aligned; use `scripts/check-package-locks.py`.
 

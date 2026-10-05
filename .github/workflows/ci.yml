@@ -88,7 +88,7 @@ jobs:
             -project Wavebook.xcodeproj \
             -scheme WavebookTests \
             -configuration Debug \
-            -derivedDataPath "$RUNNER_TEMP/wavebook-debug" \
+            -derivedDataPath "$RUNNER_TEMP/wavebook-derived-data" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             SDKROOT=auto \
@@ -102,7 +102,7 @@ jobs:
             -project Wavebook.xcodeproj \
             -scheme Wavebook \
             -configuration Release \
-            -derivedDataPath "$RUNNER_TEMP/wavebook-release" \
+            -derivedDataPath "$RUNNER_TEMP/wavebook-derived-data" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             SDKROOT=auto \

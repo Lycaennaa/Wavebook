@@ -4,6 +4,7 @@ This file records user-visible changes when they are prepared for publication. T
 
 ## Unreleased
 
+- Reused the shared DerivedData cache for local release packaging and kept package-time app modifications out of cached build products.
 - Added a filterable **Lyrics** playlist, exact playlist track counts, and clearer sidebar spacing.
 - Arranged playback controls in a compact two-row grid on the right side of the player.
 - Replaced the placeholder feature page with an implementation-based guide; corrected and expanded its capability descriptions to match the current source tree.
