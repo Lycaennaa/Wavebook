@@ -78,7 +78,18 @@ final class SongsPageViewController: NSViewController {
     private let songList = SongListViewController()
 
     override func loadView() {
-        view = songList.view
+        let root = ThemeBackgroundView()
+        addChild(songList)
+        let songListView = songList.view
+        songListView.translatesAutoresizingMaskIntoConstraints = false
+        root.addSubview(songListView)
+        NSLayoutConstraint.activate([
+            songListView.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            songListView.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            songListView.topAnchor.constraint(equalTo: root.topAnchor),
+            songListView.bottomAnchor.constraint(equalTo: root.bottomAnchor)
+        ])
+        view = root
     }
 
     func activate() {

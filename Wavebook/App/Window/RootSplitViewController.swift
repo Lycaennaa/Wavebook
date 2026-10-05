@@ -4,7 +4,6 @@ import WavebookCore
 final class RootSplitViewController: NSViewController {
     private let sidebarController = SidebarViewController()
     private let mainController: MainViewController
-    private var mainMinimumWidthConstraint: NSLayoutConstraint?
 
     init(searchField: NSSearchField) {
         mainController = MainViewController(searchField: searchField)
@@ -17,8 +16,6 @@ final class RootSplitViewController: NSViewController {
     }
 
     override func loadView() {
-        let root = ThemeBackgroundView()
-
         sidebarController.onSelectPlaylist = { [weak self] destination in
             guard let self else { return }
             self.mainController.clearSearch()
@@ -53,42 +50,7 @@ final class RootSplitViewController: NSViewController {
         addChild(sidebarController)
         addChild(mainController)
 
-        let sidebar = sidebarController.view
-        let main = mainController.view
-        root.clipsToBounds = true
-        sidebar.clipsToBounds = true
-        main.clipsToBounds = true
-        sidebar.translatesAutoresizingMaskIntoConstraints = false
-        main.translatesAutoresizingMaskIntoConstraints = false
-        root.addSubview(main)
-        root.addSubview(sidebar)
-
-        let minimumWidthConstraint = main.widthAnchor.constraint(greaterThanOrEqualToConstant: 980)
-        mainMinimumWidthConstraint = minimumWidthConstraint
-
-        NSLayoutConstraint.activate([
-            sidebar.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-            sidebar.topAnchor.constraint(equalTo: root.topAnchor),
-            sidebar.bottomAnchor.constraint(equalTo: root.bottomAnchor),
-            sidebar.widthAnchor.constraint(equalToConstant: 200),
-            main.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
-            minimumWidthConstraint,
-            main.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            main.topAnchor.constraint(equalTo: root.topAnchor),
-            main.bottomAnchor.constraint(equalTo: root.bottomAnchor)
-        ])
-
-        view = root
-    }
-
-    func beginLiveResize() {
-        mainMinimumWidthConstraint?.isActive = false
-    }
-
-    func endLiveResize() {
-        guard let mainMinimumWidthConstraint else { return }
-        mainMinimumWidthConstraint.constant = max(0, view.bounds.width - 200)
-        mainMinimumWidthConstraint.isActive = true
+        view = RootSplitView(sidebar: sidebarController.view, main: mainController.view)
     }
 
     func handleMediaKey(_ command: MediaKeyCommand) -> Bool {

@@ -89,35 +89,6 @@ final class MainWindowController: NSWindowController {
         window.contentView = root.view
         window.center()
         super.init(window: window)
-        installResizeObservers(on: window)
-    }
-
-    deinit {
-        NotificationCenter.default.removeObserver(self)
-    }
-
-    private func installResizeObservers(on window: NSWindow) {
-        let center = NotificationCenter.default
-        center.addObserver(
-            self,
-            selector: #selector(liveResizeWillStart),
-            name: NSWindow.willStartLiveResizeNotification,
-            object: window
-        )
-        center.addObserver(
-            self,
-            selector: #selector(liveResizeDidEnd),
-            name: NSWindow.didEndLiveResizeNotification,
-            object: window
-        )
-    }
-
-    @objc private func liveResizeWillStart() {
-        root.beginLiveResize()
-    }
-
-    @objc private func liveResizeDidEnd() {
-        root.endLiveResize()
     }
 
     @available(*, unavailable)

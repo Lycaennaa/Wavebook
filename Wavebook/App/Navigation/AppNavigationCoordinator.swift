@@ -42,23 +42,6 @@ enum NavigationDestination: Equatable {
     }
 }
 
-enum CatalogAppendKind {
-    case page
-    case facets
-    case details
-}
-
-@MainActor
-protocol NavigationHost: AnyObject {
-    var page: LibraryPage { get }
-    var view: NSView { get }
-    var selectedTrack: Track? { get }
-    var tracks: [Track] { get }
-    func activate()
-    func deactivate()
-    func refresh()
-}
-
 @MainActor
 protocol PlaylistNavigationHost: NavigationHost {
     var playlistDestination: PlaylistDestination { get }
@@ -66,16 +49,6 @@ protocol PlaylistNavigationHost: NavigationHost {
     func setQuery(_ query: String)
     func updateQuery(_ query: String)
     func cancelLoading()
-}
-
-@MainActor
-protocol CatalogNavigationHost: NavigationHost {
-    var route: CatalogRoute { get }
-    func select(route: CatalogRoute)
-    func clear()
-    func apply(result: CatalogPageResult)
-    func appendRequest(query: String, kind: CatalogAppendKind) -> CatalogPageAppendRequest?
-    func shuffleRequest(query: String) -> CatalogShuffleRequest?
 }
 
 @MainActor

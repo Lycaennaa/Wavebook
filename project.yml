@@ -160,6 +160,16 @@ targets:
       - path: Wavebook/App/StatisticsHeatmapView.swift
       - path: Wavebook/App/AppTheme.swift
       - path: Wavebook/App/AppAppearance.swift
+      - path: Wavebook/App/ThemeAwareViews.swift
+      - path: Wavebook/App/Window/RootSplitView.swift
+      - path: Wavebook/App/SongList/SongListViewController.swift
+      - path: Wavebook/App/SongList/SongItem.swift
+      - path: Wavebook/App/SongList/SongListContextMenu.swift
+      - path: Wavebook/App/Catalog/BrowseListViewController.swift
+      - path: Wavebook/App/Artwork
+      - path: Wavebook/App/Catalog/SongsPageViewController.swift
+      - path: Wavebook/App/Navigation/CatalogNavigationHost.swift
+      - path: Wavebook/App/Navigation/LibraryPage.swift
       - path: Wavebook/Tests/WavebookCoreTests/Fixtures
         buildPhase: resources
     configFiles:
