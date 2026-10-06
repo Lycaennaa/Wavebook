@@ -19,9 +19,9 @@ Remove music paths, account information, personal metadata, checksums for privat
 
 Describe the use case, the local workflow it improves, and any relevant audio-file, library, or macOS constraints. A request should not assume App Store distribution, notarization, or automatic updates; those are not part of the current distribution model.
 
-## Release and checksum problems
+## Release digest and provenance problems
 
-For a downloaded release, report the tag, asset name, checksum command result, and macOS error. Do not bypass a checksum mismatch or Gatekeeper warning by default; first verify that the ZIP and checksum came from the same GitHub Release.
+For a downloaded release, report the tag, asset name, local SHA-256 result, GitHub-displayed asset digest, and macOS error. Do not bypass a digest mismatch or Gatekeeper warning by default; verify the ZIP and its provenance from the same GitHub Release.
 
 ## Security issues
 

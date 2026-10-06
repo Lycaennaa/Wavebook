@@ -12,22 +12,21 @@ The main features is the AMOLED Black theme, a full 31 band parametric EQ, outpu
 
 ## Download and use
 
-Download the app ZIP and its matching `.sha256` file from this repository's Releases page. Verify the archive before opening it; replace `<version>` with the version in the filenames:
+Download `Wavebook-<version>.zip` from this repository's Releases page. GitHub displays a SHA-256 digest for the asset. Compare it with a local digest before opening the archive; replace `<version>` with the version in the filename:
 
 ```sh
-shasum -a 256 -c Wavebook-<version>.zip.sha256
+shasum -a 256 "Wavebook-<version>.zip"
 ```
 
-GitHub also publishes build-provenance attestations for the ZIP and checksum. Verify both with the GitHub CLI, replacing `<version>` and `<owner>/<repo>` with the release values:
+GitHub also publishes a build-provenance attestation for the ZIP. Verify it with the GitHub CLI, replacing `<version>` and `<owner>/<repo>` with the release values:
 
 ```sh
 gh attestation verify "Wavebook-<version>.zip" --repo "<owner>/<repo>"
-gh attestation verify "Wavebook-<version>.zip.sha256" --repo "<owner>/<repo>"
 ```
 
 Attestations use the GitHub Actions identity; they do not require an Apple ID and do not replace macOS code signing or notarization.
 
-Release builds are ad-hoc signed and not notarized, so Gatekeeper may warn on first launch. After verifying the checksum and GitHub provenance, extract the ZIP and move `Wavebook.app` to `/Applications`. If macOS blocks it, use Finder's Control-click > Open flow. If you intentionally choose to remove quarantine after verifying the download, run `xattr -dr com.apple.quarantine /Applications/Wavebook.app`; this targets the quarantine attribute only. The app bundle includes `LICENSE.txt` and `THIRD_PARTY_NOTICES.txt` in `Contents/Resources`.
+Release builds are ad-hoc signed and not notarized, so Gatekeeper may warn on first launch. After verifying the digest against GitHub's displayed asset digest and verifying provenance, extract the ZIP and move `Wavebook.app` to `/Applications`. If macOS blocks it, use Finder's Control-click > Open flow. If you intentionally choose to remove quarantine after verifying the download, run `xattr -dr com.apple.quarantine /Applications/Wavebook.app`; this targets the quarantine attribute only. The app bundle includes `LICENSE.txt` and `THIRD_PARTY_NOTICES.txt` in `Contents/Resources`.
 
 ## More information
 
