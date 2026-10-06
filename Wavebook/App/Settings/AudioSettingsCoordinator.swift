@@ -184,6 +184,7 @@ final class AudioSettingsCoordinator {
         owner: NSViewController,
         analysis: ReplayGainAnalysisCoordinator,
         libraryFolders: LibraryFolderSettingsActions,
+        onStartOnboarding: @escaping () -> Void,
         reactivate: @escaping () -> Void
     ) {
         settingsPanelBinder.configure(.init(
@@ -203,6 +204,7 @@ final class AudioSettingsCoordinator {
                 self?.playbackTransport.setSkipSilentSegments(enabled) ?? false
             },
             libraryFolders: libraryFolders,
+            onStartOnboarding: onStartOnboarding,
             reactivate: reactivate
         ))
     }

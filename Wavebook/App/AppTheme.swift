@@ -9,6 +9,9 @@ enum AppTheme {
         AppAppearance(rawValue: UserDefaults.standard.string(forKey: appearanceKey) ?? "") ?? .system
     }
 
+    static func hasPersistedAppearance(in defaults: UserDefaults = .standard) -> Bool {
+        defaults.object(forKey: appearanceKey) != nil
+    }
     static let background = dynamicColor(named: "background") { mode, appearance in
         mode == .amoled ? .black : resolved(.windowBackgroundColor, with: appearance)
     }

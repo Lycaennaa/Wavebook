@@ -6,6 +6,7 @@ final class SettingsPanelController: NSWindowController, NSWindowDelegate {
     var onHiddenOutputDeviceUIDsChanged: ((Set<String>) -> Void)?
     var onReplayGainAnalysisFileConcurrencyChanged: ((Int) -> Void)?
     var onSkipSilentSegmentsChanged: ((Bool) -> Void)?
+    var onStartOnboarding: (() -> Void)?
 
     private let popup = NSPopUpButton()
     private let appearancePopup = NSPopUpButton()
@@ -133,7 +134,7 @@ extension SettingsPanelController {
     private func makeContentView() -> NSView {
         let root = ThemeBackgroundView()
         let failuresScrollView = makeFailuresScrollView()
-        let views = makeAppearanceViews() + [libraryFoldersView] + makeOutputViews()
+        let views = makeAppearanceViews() + [makeOnboardingButton(), libraryFoldersView] + makeOutputViews()
         let analysisViews = makeAnalysisViews(failuresScrollView: failuresScrollView)
         let stack = NSStackView(views: views + analysisViews)
         stack.orientation = .vertical
@@ -182,6 +183,17 @@ extension SettingsPanelController {
         appearanceStack.alignment = .centerY
         appearanceStack.spacing = 10
         return [appearanceTitle, appearanceStack]
+    }
+
+    private func makeOnboardingButton() -> NSButton {
+        let button = NSButton(
+            title: "Start Onboarding Flow…",
+            target: self,
+            action: #selector(startOnboardingFlow)
+        )
+        button.bezelStyle = .rounded
+        button.contentTintColor = AppTheme.accent
+        return button
     }
 
     private func makeOutputViews() -> [NSView] {
@@ -418,6 +430,11 @@ extension SettingsPanelController {
     @objc private func appearanceChanged() {
         guard let appearance = appearancePopup.selectedItem?.representedObject as? AppAppearance else { return }
         AppTheme.apply(appearance)
+    }
+
+    @objc private func startOnboardingFlow() {
+        close()
+        onStartOnboarding?()
     }
 
     @objc private func outputChanged() {

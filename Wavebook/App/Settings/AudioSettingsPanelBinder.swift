@@ -14,6 +14,7 @@ final class AudioSettingsPanelBinder {
         let onHiddenOutputDeviceUIDsChanged: (Set<String>) -> Void
         let onSkipSilentSegmentsChanged: (Bool) -> Bool
         let libraryFolders: LibraryFolderSettingsActions
+        let onStartOnboarding: () -> Void
         let reactivate: () -> Void
     }
 
@@ -29,6 +30,7 @@ final class AudioSettingsPanelBinder {
         let playbackTransport = configuration.playbackTransport
         let onSkipSilentSegmentsChanged = configuration.onSkipSilentSegmentsChanged
         panel.onOutputDeviceChanged = configuration.onOutputDeviceChanged
+        panel.onStartOnboarding = configuration.onStartOnboarding
         panel.onHiddenOutputDeviceUIDsChanged = configuration.onHiddenOutputDeviceUIDsChanged
         panel.onSkipSilentSegmentsChanged = { [weak panel] enabled in
             guard onSkipSilentSegmentsChanged(enabled) else {

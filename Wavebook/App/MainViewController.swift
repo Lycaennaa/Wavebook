@@ -34,6 +34,7 @@ final class MainViewController: NSViewController {
     lazy var notifications = ApplicationNotificationCoordinator(logger: Self.logger)
     var onPageChanged: ((LibraryPage) -> Void)?
     var onPlaylistCatalogChanged: (([Playlist]) -> Void)?
+    var onOnboardingRequested: (() -> Void)?
 
     let songsPage = SongsPageViewController()
     let artistsPage = ArtistsPageViewController()

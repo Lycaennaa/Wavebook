@@ -3,6 +3,8 @@
 This file records user-visible changes when they are prepared for publication. The release workflow also generates GitHub release notes from version tags.
 
 ## Unreleased
+- Added a fresh-install welcome screen with multi-folder setup, background scanning, and Help/Settings actions to reopen it.
+- Refined welcome copy and added Debug-only JSON reload for copy iteration.
 
 - Manage library folders in Settings, including removing indexed tracks without deleting audio files.
 - Kept song rows left-aligned and full-width beside the sidebar when growing or shrinking the window, including programmatic resizing.

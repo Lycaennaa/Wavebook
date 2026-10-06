@@ -9,6 +9,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var terminationInProgress = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Old versions persisted appearance on every launch; use that only to exclude existing installs once.
+        let shouldShowWelcome = OnboardingLaunchPolicy.shouldShowWelcome(
+            isLegacyInstall: { AppTheme.hasPersistedAppearance() }
+        )
         NSApp.setActivationPolicy(.regular)
         installMainMenu()
         AppTheme.applySavedAppearance()
@@ -16,6 +20,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let windowController = MainWindowController()
         self.windowController = windowController
         windowController.showWindow(nil)
+        if shouldShowWelcome {
+            windowController.showOnboarding()
+        }
         windowController.window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         registerRemoteCommands()
@@ -55,6 +62,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         windowController?.showSettings()
     }
 
+    @objc private func showOnboarding(_ sender: Any?) {
+        windowController?.showOnboarding()
+    }
+#if DEBUG
+    @objc private func chooseOnboardingCopyFile(_ sender: Any?) {
+        windowController?.chooseOnboardingCopyFile()
+    }
+
+    @objc private func reloadOnboardingCopy(_ sender: Any?) {
+        windowController?.reloadOnboardingCopy()
+    }
+#endif
+
     private func installMainMenu() {
         let mainMenu = NSMenu()
         for (title, submenu) in [
@@ -72,8 +92,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         windowMenuItem.title = "Window"
         windowMenuItem.submenu = windowMenu
         mainMenu.addItem(windowMenuItem)
+        let helpMenu = makeHelpMenu()
+        let helpMenuItem = NSMenuItem()
+        helpMenuItem.title = "Help"
+        helpMenuItem.submenu = helpMenu
+        mainMenu.addItem(helpMenuItem)
         NSApp.mainMenu = mainMenu
         NSApp.windowsMenu = windowMenu
+        NSApp.helpMenu = helpMenu
     }
 
     private func makeApplicationMenu() -> NSMenu {
@@ -112,6 +138,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             action: #selector(NSApplication.terminate(_:)),
             keyEquivalent: "q"
         ))
+        return menu
+    }
+
+    private func makeHelpMenu() -> NSMenu {
+        let menu = NSMenu(title: "Help")
+        let onboardingItem = NSMenuItem(
+            title: "Welcome to Wavebook…",
+            action: #selector(showOnboarding(_:)),
+            keyEquivalent: ""
+        )
+        onboardingItem.target = self
+#if DEBUG
+        menu.addItem(.separator())
+        let chooseCopyItem = NSMenuItem(
+            title: "Choose Onboarding Copy File…",
+            action: #selector(chooseOnboardingCopyFile(_:)),
+            keyEquivalent: ""
+        )
+        chooseCopyItem.target = self
+        menu.addItem(chooseCopyItem)
+        let reloadCopyItem = NSMenuItem(
+            title: "Reload Onboarding Copy",
+            action: #selector(reloadOnboardingCopy(_:)),
+            keyEquivalent: ""
+        )
+        reloadCopyItem.target = self
+        menu.addItem(reloadCopyItem)
+#endif
+        menu.addItem(onboardingItem)
         return menu
     }
 

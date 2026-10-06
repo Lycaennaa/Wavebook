@@ -26,6 +26,9 @@ extension MainViewController {
                     await self.libraryScan.removeRoot(root)
                 }
             ),
+            onStartOnboarding: { [weak self] in
+                self?.onOnboardingRequested?()
+            },
             reactivate: { [weak self] in self?.navigation.reactivateCurrentPage() }
         )
     }

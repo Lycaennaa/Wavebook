@@ -66,15 +66,17 @@ final class LibraryScanCoordinator {
         scanTask?.cancel()
     }
 
-    func addRoot() {
-        guard databaseProvider() != nil else { return }
+    @discardableResult
+    func addRoot() -> Bool {
+        guard databaseProvider() != nil else { return false }
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
         panel.prompt = "Add"
-        guard panel.runModal() == .OK else { return }
+        guard panel.runModal() == .OK, !panel.urls.isEmpty else { return false }
         addRoots(panel.urls)
+        return true
     }
 
     func libraryRoots() -> [LibraryRoot] {

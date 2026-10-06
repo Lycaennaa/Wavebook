@@ -1,0 +1,12 @@
+{
+  "welcome": {
+    "title": "Welcome to Wavebook",
+    "libraryDescription": "Browse by song, artist, album, or genre.",
+    "featureDescription": "Adjust playback with the equalizer and ReplayGain. With offline lyrics and optional online search.",
+    "folderAccessDescription": "Wavebook scans only selected folders. Audio files are not moved or deleted.",
+    "chooseFoldersButtonTitle": "Choose Music Folders…",
+    "chooseFoldersAccessibilityHelp": "Choose one or more local folders to scan.",
+    "exitButtonTitle": "Exit Onboarding",
+    "exitAccessibilityHelp": "Open Wavebook without selecting music folders."
+  }
+}

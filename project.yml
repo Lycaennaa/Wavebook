@@ -58,6 +58,8 @@ targets:
           - Assets.xcassets
       - path: Wavebook/App/Assets.xcassets
         buildPhase: resources
+      - path: OnboardingCopy.json
+        buildPhase: resources
     configFiles:
       Debug: Configuration/PublicIdentity.xcconfig
       Release: Configuration/PublicIdentity.xcconfig
@@ -157,6 +159,10 @@ targets:
       - path: Wavebook/App/Playback/PlaybackPresentationState.swift
       - path: Wavebook/App/Notifications/OperationalErrorKind.swift
       - path: Wavebook/App/Library/LibraryScanCoordinator.swift
+      - path: Wavebook/App/Onboarding/OnboardingLaunchPolicy.swift
+      - path: Wavebook/App/Onboarding/OnboardingCopy.swift
+      - path: OnboardingCopy.json
+        buildPhase: resources
       - path: Wavebook/App/SongList/SongListPaginationPolicy.swift
       - path: Wavebook/App/StatisticsHeatmapView.swift
       - path: Wavebook/App/AppTheme.swift
