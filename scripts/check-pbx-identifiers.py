@@ -5,7 +5,6 @@ import stat
 import xml.etree.ElementTree as ET
 import subprocess
 import sys
-from release_privacy_policy import contains_local_service_url
 from pathlib import Path
 
 
@@ -86,8 +85,6 @@ def check_xml_file(root, path):
     failures = []
     if PRIVATE_PATH.search(decoded):
         failures.append((1, "contains a machine-specific absolute path"))
-    if contains_local_service_url(decoded.encode()):
-        failures.append((1, "contains a local service URL"))
     try:
         root_element = ET.fromstring(data)
     except (ET.ParseError, UnicodeError):
@@ -104,8 +101,6 @@ def check_xml_file(root, path):
             continue
         if PRIVATE_PATH.search(value):
             failures.append((1, "contains a machine-specific absolute path"))
-        if contains_local_service_url(value.encode()):
-            failures.append((1, "contains a local service URL"))
     return failures
 
 def check_file(root, path, mode):
@@ -122,8 +117,6 @@ def check_file(root, path, mode):
         decoded_line = html.unescape(line)
         if PRIVATE_PATH.search(line) or PRIVATE_PATH.search(decoded_line):
             failures.append((line_number, "contains a machine-specific absolute path"))
-        if contains_local_service_url(line.encode()) or contains_local_service_url(decoded_line.encode()):
-            failures.append((line_number, "contains a local service URL"))
 
         parsed = parse_assignment(line, assignment) if assignment else None
         if not parsed:

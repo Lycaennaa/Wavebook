@@ -49,8 +49,6 @@
     fi
     exit "$status"
 
-@package:
-    sh scripts/package-release.sh
 
 @install-hooks:
     sh scripts/install-hooks.sh
@@ -78,7 +76,7 @@
     fi
 
 @check-tooling:
-    sh -n scripts/package-release.sh scripts/install-hooks.sh
+    sh -n scripts/install-hooks.sh
     python3 -B scripts/check-package-locks.py
 
 @ci:

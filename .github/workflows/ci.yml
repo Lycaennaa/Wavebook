@@ -67,7 +67,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sh -n scripts/package-release.sh scripts/install-hooks.sh
+          sh -n scripts/install-hooks.sh
           python3 -B scripts/check-pbx-identifiers.py
           python3 -B scripts/check-package-locks.py
 

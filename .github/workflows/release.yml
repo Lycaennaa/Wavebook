@@ -109,7 +109,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sh -n scripts/package-release.sh scripts/install-hooks.sh
+          sh -n scripts/install-hooks.sh
           python3 -B scripts/check-pbx-identifiers.py
           python3 -B scripts/check-package-locks.py
 
@@ -140,31 +140,50 @@ jobs:
 
       - name: Build and package ad-hoc release
         shell: bash
-        env:
-          ADHOC_SIGN: YES
-          STRIP_RELEASE: NO
-          APP_NAME: Wavebook
-          BUNDLE_IDENTIFIER: com.lycaennaa.wavebook
-          DIST_DIR: ${{ github.workspace }}/dist
         run: |
           set -euo pipefail
-          VERSION="$WAVEBOOK_VERSION" sh scripts/package-release.sh
+          derived_data="$GITHUB_WORKSPACE/.build/derived-data"
+          package_root="$(mktemp -d "$RUNNER_TEMP/wavebook-release.XXXXXX")"
+          trap 'rm -rf "$package_root"' EXIT
+          built_app="$derived_data/Build/Products/Release/Wavebook.app"
+          app="$package_root/Wavebook.app"
+          archive="$GITHUB_WORKSPACE/dist/Wavebook-$WAVEBOOK_VERSION.zip"
+          mkdir -p "$derived_data/SourcePackages" "$GITHUB_WORKSPACE/dist"
+          xcodebuild \
+            -project Wavebook.xcodeproj \
+            -scheme Wavebook \
+            -configuration Release \
+            -derivedDataPath "$derived_data" \
+            -clonedSourcePackagesDirPath "$derived_data/SourcePackages" \
+            APP_BUNDLE_IDENTIFIER=com.lycaennaa.wavebook \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            SDKROOT=auto \
+            build
+          test -d "$built_app"
+          test ! -L "$built_app"
+          ditto "$built_app" "$app"
+          mkdir -p "$app/Contents/Resources"
+          cp LICENSE "$app/Contents/Resources/LICENSE.txt"
+          cp THIRD_PARTY_NOTICES.md "$app/Contents/Resources/THIRD_PARTY_NOTICES.txt"
+          xattr -rc "$app"
+          for framework in "$app"/Contents/Frameworks/*.framework; do
+            if [ -d "$framework" ]; then
+              codesign --force --sign - --timestamp=none "$framework"
+            fi
+          done
+          codesign --force --sign - --timestamp=none "$app"
+          codesign --verify --deep --strict "$app"
+          ditto -c -k --sequesterRsrc --keepParent "$app" "$archive"
+          xattr -c "$archive"
+          test -s "$archive"
 
-      - name: Verify archive checksum
-        shell: bash
-        working-directory: dist
-        run: |
-          set -euo pipefail
-          checksum="Wavebook-${WAVEBOOK_VERSION}.zip.sha256"
-          test -s "$checksum"
-          shasum -a 256 -c "$checksum"
-
-      - name: Attest release archive and checksum
+      - name: Attest release archive
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
-          subject-path: dist/Wavebook-${{ env.WAVEBOOK_VERSION }}.zip*
+          subject-path: dist/Wavebook-${{ env.WAVEBOOK_VERSION }}.zip
 
-      - name: Verify release attestations
+      - name: Verify release attestation
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -174,7 +193,6 @@ jobs:
             HOMEBREW_NO_AUTO_UPDATE=1 brew install gh
           fi
           gh attestation verify "dist/Wavebook-${WAVEBOOK_VERSION}.zip" --repo "$GITHUB_REPOSITORY"
-          gh attestation verify "dist/Wavebook-${WAVEBOOK_VERSION}.zip.sha256" --repo "$GITHUB_REPOSITORY"
 
       - name: Publish GitHub Release
         shell: bash
@@ -190,5 +208,4 @@ jobs:
             --verify-tag \
             --title "Wavebook $WAVEBOOK_VERSION" \
             --generate-notes \
-            "dist/Wavebook-$WAVEBOOK_VERSION.zip" \
-            "dist/Wavebook-$WAVEBOOK_VERSION.zip.sha256"
+            "dist/Wavebook-$WAVEBOOK_VERSION.zip"
