@@ -9,7 +9,7 @@ The following describes capabilities visible in the current source tree. Listed 
 ## Library and discovery
 
 - Add one or more local folders and scan files with `mp3`, `flac`, `opus`, `m4a`, `aac`, `wav`, `aif`, `aiff`, `aifc`, and `caf` filename extensions.
-- Fresh installs open a welcome screen and guided folder step; multiple folders can be managed while scans run, and users can enter the library before scans finish. Progress shows checked audio files out of the discovered total for each folder. Reopen onboarding from Help or Settings.
+- Fresh installs open a welcome screen, guided folder step, and personalization step; multiple folders can be managed while scans run, and users can enter the library before scans finish. Progress shows checked audio files out of the discovered total for each folder. Personalization applies appearance, ReplayGain, and silence-skipping preferences immediately and links to the 31-band EQ editor. Reopen onboarding from Help or Settings.
 - Manage library folders in Settings; removing a folder removes its indexed tracks from Wavebook without deleting files from disk.
 - Browse and search songs, artists, albums, and genres; navigate between related catalog entries.
 - Read audio metadata and display embedded artwork or supported sidecar images named `cover`, `folder`, or `front`.
@@ -38,14 +38,14 @@ The following describes capabilities visible in the current source tree. Listed 
 
 ## Audio processing
 
-- Apply track- or album-mode ReplayGain using available ReplayGain or R128 values.
+- Apply ReplayGain to help keep songs at a more consistent volume, in track or album mode, using available ReplayGain or R128 values.
 - Analyze selected tracks or albums, review analysis status and failures, configure file concurrency, cancel work, and rescan analysis; results are cached locally.
-- Use a 31-band equalizer with preamp, bypass, reset-to-flat, and text import controls. Equalizer profiles are saved per output device.
+- Use a personal 31-band EQ with preamp, bypass, reset-to-flat, and text import controls. Profiles are saved separately per output device.
 
 ## Listening history and appearance
 
 - Record qualified listening history locally. View yearly and lifetime summaries, plays-per-day heatmaps, day timelines, rankings for songs, albums, artists, and genres, and top-skipped songs.
 - Enable private listening to stop recording history, or reset stored listening history.
-- Choose System, Light, Dark, or AMOLED Black appearance. Playback preferences such as volume, output device, ReplayGain, equalizer, and silence skipping persist locally.
+- Use System appearance by default, or choose Light, Dark, or AMOLED Black. Playback preferences such as volume, output device, ReplayGain, equalizer, and silence skipping persist locally.
 
 See [PRIVACY.md](PRIVACY.md) for what these features read, write, and send outside the Mac.

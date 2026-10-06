@@ -8,11 +8,13 @@ final class RootSplitViewController: NSViewController {
     private enum OnboardingStep {
         case welcome(OnboardingWelcomeViewController)
         case folders(OnboardingFoldersViewController)
+        case personalization(OnboardingPersonalizationViewController)
 
         var viewController: NSViewController {
             switch self {
             case let .welcome(controller): controller
             case let .folders(controller): controller
+            case let .personalization(controller): controller
             }
         }
     }
@@ -95,15 +97,17 @@ final class RootSplitViewController: NSViewController {
     }
 
     func showOnboarding() {
-        if onboardingStep == nil {
-            let controller = OnboardingWelcomeViewController(
-                copy: onboardingCopy,
-                onChooseFolders: { [weak self] in self?.showOnboardingFolders() },
-                onExit: { [weak self] in self?.showLibrary() }
-            )
-            displayOnboardingStep(.welcome(controller))
-        }
+        if onboardingStep == nil { showOnboardingWelcome() }
         view.window?.makeKeyAndOrderFront(nil)
+    }
+
+    private func showOnboardingWelcome() {
+        let controller = OnboardingWelcomeViewController(
+            copy: onboardingCopy,
+            onChooseFolders: { [weak self] in self?.showOnboardingFolders() },
+            onExit: { [weak self] in self?.showLibrary() }
+        )
+        displayOnboardingStep(.welcome(controller))
     }
 
     private func showOnboardingFolders() {
@@ -111,9 +115,33 @@ final class RootSplitViewController: NSViewController {
         let controller = OnboardingFoldersViewController(
             folderActions: mainController.libraryFolderSettingsActions,
             scanSnapshot: mainController.libraryScan.snapshot,
+            onBack: { [weak self] in self?.showOnboardingWelcome() },
+            onContinue: { [weak self] in self?.showOnboardingPersonalization() },
             onOpenLibrary: { [weak self] in self?.showLibrary() }
         )
         displayOnboardingStep(.folders(controller))
+    }
+
+    private func showOnboardingPersonalization() {
+        guard onboardingStep != nil else { return }
+        let controller = OnboardingPersonalizationViewController(
+            appearance: AppTheme.appearance,
+            replayGainMode: mainController.playbackSession.replayGain.mode,
+            skipSilentSegments: mainController.playbackSession.transport.skipSilentSegments,
+            onAppearanceChanged: { AppTheme.apply($0) },
+            onReplayGainModeChanged: { [weak self] mode in
+                guard let self else { return false }
+                return self.mainController.playbackSession.replayGain.setMode(mode)
+            },
+            onSkipSilentSegmentsChanged: { [weak self] enabled in
+                guard let self else { return false }
+                return self.mainController.playbackSession.transport.setSkipSilentSegments(enabled)
+            },
+            onOpenEqualizer: { [weak self] in self?.mainController.showEqualizer() },
+            onBack: { [weak self] in self?.showOnboardingFolders() },
+            onReturnToLibrary: { [weak self] in self?.showLibrary() }
+        )
+        displayOnboardingStep(.personalization(controller))
     }
 
     private func displayOnboardingStep(_ step: OnboardingStep) {

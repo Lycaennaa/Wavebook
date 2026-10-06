@@ -106,16 +106,21 @@ final class PlaybackReplayGainController {
 
     @discardableResult
     func cycleMode() -> Bool {
+        setMode(mode.next)
+    }
+
+    @discardableResult
+    func setMode(_ mode: ReplayGainMode) -> Bool {
+        guard mode != self.mode else { return true }
         guard let database = databaseProvider() else { return false }
-        let nextMode = mode.next
         do {
-            try database.saveReplayGainMode(nextMode)
+            try database.saveReplayGainMode(mode)
             onEvent?(.clearOperationalErrors(.database))
         } catch {
             onEvent?(.error(error, message: "Could not save ReplayGain mode", kind: .database))
             return false
         }
-        mode = nextMode
+        self.mode = mode
         presentation = ReplayGainPresentation(
             track: presentation.track,
             data: presentation.data,

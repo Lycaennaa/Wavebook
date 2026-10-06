@@ -6,6 +6,7 @@ This file records user-visible changes when they are prepared for publication. T
 - Added a fresh-install welcome screen with multi-folder setup, background scanning, and Help/Settings actions to reopen it.
 - Refined welcome copy and added Debug-only JSON reload for copy iteration.
 - Added a guided folder step with multi-folder management, per-folder scanned/total audio-file counts, and early library access.
+- Added onboarding personalization for appearance, ReplayGain, and silence skipping, with a link to the existing 31-band EQ editor.
 
 - Manage library folders in Settings, including removing indexed tracks without deleting audio files.
 - Kept song rows left-aligned and full-width beside the sidebar when growing or shrinking the window, including programmatic resizing.

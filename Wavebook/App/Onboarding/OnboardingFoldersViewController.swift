@@ -4,6 +4,8 @@ import AppKit
 final class OnboardingFoldersViewController: NSViewController {
   private let folderActions: LibraryFolderSettingsActions
   private let onOpenLibrary: () -> Void
+  private let onBack: () -> Void
+  private let onContinue: () -> Void
   private var hasObservedScan = false
   private var scanSnapshot: LibraryScanSnapshot
   private let titleLabel = NSTextField(labelWithString: "Add your music folders")
@@ -15,14 +17,20 @@ final class OnboardingFoldersViewController: NSViewController {
   private let scanIndicator = NSProgressIndicator()
   private let foldersView = LibraryFoldersSettingsView()
   private let openLibraryButton = NSButton(title: "Open Library", target: nil, action: nil)
+  private let backButton = NSButton(title: "Back", target: nil, action: nil)
+  private let continueButton = NSButton(title: "Continue", target: nil, action: nil)
 
   init(
     folderActions: LibraryFolderSettingsActions,
     scanSnapshot: LibraryScanSnapshot,
+    onBack: @escaping () -> Void,
+    onContinue: @escaping () -> Void,
     onOpenLibrary: @escaping () -> Void
   ) {
     self.folderActions = folderActions
     self.scanSnapshot = scanSnapshot
+    self.onBack = onBack
+    self.onContinue = onContinue
     self.onOpenLibrary = onOpenLibrary
     super.init(nibName: nil, bundle: nil)
   }
@@ -49,18 +57,27 @@ final class OnboardingFoldersViewController: NSViewController {
     scanIndicator.controlSize = .small
     scanIndicator.setAccessibilityLabel("Library scan progress")
 
+    backButton.target = self
+    backButton.action = #selector(goBack)
+    backButton.bezelStyle = .rounded
+    continueButton.target = self
+    continueButton.action = #selector(continueOnboarding)
+    continueButton.bezelStyle = .rounded
+    continueButton.keyEquivalent = "\r"
     openLibraryButton.target = self
     openLibraryButton.action = #selector(openLibrary)
     openLibraryButton.bezelStyle = .rounded
-    openLibraryButton.keyEquivalent = "\r"
-
     foldersView.configure(folderActions)
     let scanStatus = NSStackView(views: [scanIndicator, scanStatusLabel])
     scanStatus.orientation = .horizontal
     scanStatus.alignment = .centerY
     scanStatus.spacing = 8
+    let navigation = NSStackView(views: [backButton, continueButton, openLibraryButton])
+    navigation.orientation = .horizontal
+    navigation.alignment = .centerY
+    navigation.spacing = 10
     let content = NSStackView(views: [
-      titleLabel, descriptionLabel, scanStatus, foldersView, openLibraryButton
+      titleLabel, descriptionLabel, scanStatus, foldersView, navigation
     ])
     content.orientation = .vertical
     content.alignment = .centerX
@@ -148,6 +165,14 @@ final class OnboardingFoldersViewController: NSViewController {
 
   private func folderName(for root: URL) -> String {
     root.lastPathComponent.isEmpty ? root.path : root.lastPathComponent
+  }
+
+  @objc private func goBack() {
+    onBack()
+  }
+
+  @objc private func continueOnboarding() {
+    onContinue()
   }
 
   @objc private func openLibrary() {
