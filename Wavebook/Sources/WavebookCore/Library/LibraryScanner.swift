@@ -38,6 +38,9 @@ public struct LibraryScanResult: Sendable {
     }
 }
 
+/// Receives completed and total audio-candidate counts after folder discovery.
+public typealias LibraryScanProgressHandler = @Sendable (Int, Int) async -> Void
+
 /// Discovers audio and lyric files for a library root.
 public actor LibraryScanner {
     /// File extensions scanned as native audio candidates.
@@ -93,7 +96,8 @@ extension LibraryScanner {
     public func scan(
         root: URL,
         database: LibraryDatabase,
-        generation: UUID = UUID()
+        generation: UUID = UUID(),
+        progress: LibraryScanProgressHandler? = nil
     ) async throws -> LibraryScanResult {
         let rootPath = try LibraryDatabase.resolveRootPath(root.standardizedFileURL.path)
         try Task.checkCancellation()
@@ -114,18 +118,18 @@ extension LibraryScanner {
         return try await scanDiscoveredRoot(
             root: root,
             rootPath: rootPath,
-            generation: generation,
             database: database,
-            discovered: discovered
+            discovered: discovered,
+            execution: ScanExecution(generation: generation, progress: progress)
         )
     }
 
     private func scanDiscoveredRoot(
         root: URL,
         rootPath: String,
-        generation: UUID,
         database: LibraryDatabase,
-        discovered: LibraryDiscoveryResult
+        discovered: LibraryDiscoveryResult,
+        execution: ScanExecution
     ) async throws -> LibraryScanResult {
         guard !discovered.preservationLimitExceeded else {
             throw LibraryScannerError.tooManyPreservedFailurePaths(root, limit: preservedFailurePathLimit)
@@ -135,7 +139,7 @@ extension LibraryScanner {
         var collection = try await collectScanCollection(
             discovered: discovered,
             rootPath: rootPath,
-            generation: generation,
+            execution: execution,
             reusableTracks: reusableTracks
         )
         let discoveredTrackPaths = Set(collection.tracks.map(\.path))
@@ -163,7 +167,7 @@ extension LibraryScanner {
                 paths: collection.failedCandidatePaths
             )
         }
-        try checkScanGeneration(rootPath: rootPath, generation: generation)
+        try checkScanGeneration(rootPath: rootPath, generation: execution.generation)
         collection.tracks.sort { CatalogFacetOrdering.localizedPathPrecedes($0.path, $1.path) }
         let persistedTracks = try persistScanChanges(
             collection: collection,
@@ -205,16 +209,18 @@ extension LibraryScanner {
     private func collectScanCollection(
         discovered: LibraryDiscoveryResult,
         rootPath: String,
-        generation: UUID,
+        execution: ScanExecution,
         reusableTracks: [String: LibraryScanReuseEntry]
     ) async throws -> ScanCollection {
         let metadataReader = metadataReader
         // Measurements favor more overlap through 1,000 tracks and a lower cap at larger scales.
         let maximumConcurrentCount = discovered.audio.count > 1_000 ? 4 : 8
+        await execution.progress?(0, discovered.audio.count)
         var results = try await BoundedTaskRunner.run(
             items: discovered.audio,
             maximumConcurrentCount: maximumConcurrentCount,
             cancellationCheck: { try Task.checkCancellation() },
+            progress: execution.progress,
             operation: { url in
                 try await LibraryScanCandidateLoader.candidateResult(
                     for: url,
@@ -224,15 +230,20 @@ extension LibraryScanner {
             }
         )
 
-        try checkScanGeneration(rootPath: rootPath, generation: generation)
+        try checkScanGeneration(rootPath: rootPath, generation: execution.generation)
         let collection = try Self.collectScanResults(&results, discovered: discovered)
-        try checkScanGeneration(rootPath: rootPath, generation: generation)
+        try checkScanGeneration(rootPath: rootPath, generation: execution.generation)
         return collection
     }
 
     private func checkScanGeneration(rootPath: String, generation: UUID) throws {
         try Task.checkCancellation()
         guard scanGenerations[rootPath] == generation else { throw CancellationError() }
+    }
+
+    private struct ScanExecution: Sendable {
+        let generation: UUID
+        let progress: LibraryScanProgressHandler?
     }
 
     private struct ScanCollection {

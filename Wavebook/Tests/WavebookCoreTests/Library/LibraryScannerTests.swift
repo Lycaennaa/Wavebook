@@ -2,6 +2,18 @@ import Foundation
 @testable import WavebookCore
 import XCTest
 
+private actor LibraryScanProgressRecorder {
+    private var updates: [String] = []
+
+    func record(completedCount: Int, totalCount: Int) {
+        updates.append("\(completedCount)/\(totalCount)")
+    }
+
+    func snapshot() -> [String] {
+        updates
+    }
+}
+
 extension LibraryScannerTests {
     func testScanAddsAndPrunesOnlyChangedTracks() async throws {
         let root = try makeRoot()
@@ -26,6 +38,25 @@ extension LibraryScannerTests {
         XCTAssertEqual(removedResult.tracks.map(\.title), ["One"])
         XCTAssertEqual(removedResult.tracks.first?.id, firstID)
         XCTAssertEqual(try database.tracks().map(\.title), ["One"])
+    }
+
+    func testScanReportsCandidateProgressAgainstKnownTotal() async throws {
+        let root = try makeRoot()
+        try writeWAV(to: root.appending(path: "One.wav"))
+        try writeWAV(to: root.appending(path: "Two.wav"))
+        let recorder = LibraryScanProgressRecorder()
+        let database = try LibraryDatabase(inMemory: true)
+
+        try await LibraryScanner().scan(
+            root: root,
+            database: database,
+            progress: { completedCount, totalCount in
+                await recorder.record(completedCount: completedCount, totalCount: totalCount)
+            }
+        )
+
+        let progressUpdates = await recorder.snapshot()
+        XCTAssertEqual(progressUpdates, ["0/2", "1/2", "2/2"])
     }
 
     func testUnchangedAliasCannotHideAnotherDeletedTrack() async throws {

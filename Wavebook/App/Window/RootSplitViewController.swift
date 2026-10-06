@@ -5,7 +5,19 @@ import WavebookCore
 final class RootSplitViewController: NSViewController {
     private let sidebarController = SidebarViewController()
     private let mainController: MainViewController
-    private var onboardingController: OnboardingWelcomeViewController?
+    private enum OnboardingStep {
+        case welcome(OnboardingWelcomeViewController)
+        case folders(OnboardingFoldersViewController)
+
+        var viewController: NSViewController {
+            switch self {
+            case let .welcome(controller): controller
+            case let .folders(controller): controller
+            }
+        }
+    }
+
+    private var onboardingStep: OnboardingStep?
     private var onboardingCopy = OnboardingCopy.bundled()
 #if DEBUG
     private static let onboardingCopyPathKey = "Wavebook.debugOnboardingCopyPath"
@@ -37,6 +49,10 @@ final class RootSplitViewController: NSViewController {
 
         mainController.onOnboardingRequested = { [weak self] in
             self?.showOnboarding()
+        }
+        mainController.onLibraryScanStateChanged = { [weak self] snapshot in
+            guard let self, case let .folders(controller) = self.onboardingStep else { return }
+            controller.updateScanState(snapshot)
         }
         sidebarController.onRenamePlaylist = { [weak self] id in
             self?.mainController.beginRenamePlaylist(id: id)
@@ -79,35 +95,53 @@ final class RootSplitViewController: NSViewController {
     }
 
     func showOnboarding() {
-        if onboardingController == nil {
+        if onboardingStep == nil {
             let controller = OnboardingWelcomeViewController(
                 copy: onboardingCopy,
-                onChooseFolders: { [weak self] in
-                    guard let self, self.mainController.addRootFromOnboarding() else { return }
-                    self.showLibrary()
-                },
+                onChooseFolders: { [weak self] in self?.showOnboardingFolders() },
                 onExit: { [weak self] in self?.showLibrary() }
             )
-            addChild(controller)
-            onboardingController = controller
-            let onboardingView = controller.view
-            onboardingView.translatesAutoresizingMaskIntoConstraints = false
-            view.addSubview(onboardingView)
-            NSLayoutConstraint.activate([
-                onboardingView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-                onboardingView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-                onboardingView.topAnchor.constraint(equalTo: view.topAnchor),
-                onboardingView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
-            ])
+            displayOnboardingStep(.welcome(controller))
         }
         view.window?.makeKeyAndOrderFront(nil)
     }
 
+    private func showOnboardingFolders() {
+        guard onboardingStep != nil else { return }
+        let controller = OnboardingFoldersViewController(
+            folderActions: mainController.libraryFolderSettingsActions,
+            scanSnapshot: mainController.libraryScan.snapshot,
+            onOpenLibrary: { [weak self] in self?.showLibrary() }
+        )
+        displayOnboardingStep(.folders(controller))
+    }
+
+    private func displayOnboardingStep(_ step: OnboardingStep) {
+        if let onboardingStep {
+            let currentController = onboardingStep.viewController
+            currentController.view.removeFromSuperview()
+            currentController.removeFromParent()
+        }
+        let controller = step.viewController
+        addChild(controller)
+        onboardingStep = step
+        let onboardingView = controller.view
+        onboardingView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(onboardingView)
+        NSLayoutConstraint.activate([
+            onboardingView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            onboardingView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            onboardingView.topAnchor.constraint(equalTo: view.topAnchor),
+            onboardingView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+    }
+
     private func showLibrary() {
-        guard let onboardingController else { return }
-        onboardingController.view.removeFromSuperview()
-        onboardingController.removeFromParent()
-        self.onboardingController = nil
+        guard let onboardingStep else { return }
+        let controller = onboardingStep.viewController
+        controller.view.removeFromSuperview()
+        controller.removeFromParent()
+        self.onboardingStep = nil
     }
 #if DEBUG
     func chooseOnboardingCopyFile() {
@@ -144,7 +178,9 @@ final class RootSplitViewController: NSViewController {
             let copy = try OnboardingCopy.load(from: url)
             onboardingCopy = copy
             UserDefaults.standard.set(url.path, forKey: Self.onboardingCopyPathKey)
-            onboardingController?.update(copy: copy)
+            if case let .welcome(controller) = onboardingStep {
+                controller.update(copy: copy)
+            }
         } catch {
             let alert = NSAlert()
             alert.messageText = "Could not load onboarding copy"

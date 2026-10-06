@@ -2,8 +2,15 @@ import Foundation
 import WavebookCore
 extension MainViewController {
 
-    func addRootFromOnboarding() -> Bool {
-        libraryScan.addRoot()
+    var libraryFolderSettingsActions: LibraryFolderSettingsActions {
+        LibraryFolderSettingsActions(
+            roots: { [weak self] in self?.libraryScan.libraryRoots() ?? [] },
+            add: { [weak self] roots in self?.libraryScan.addRoots(roots) },
+            remove: { [weak self] root in
+                guard let self else { return }
+                await self.libraryScan.removeRoot(root)
+            }
+        )
     }
 
     @objc func addRoot() {

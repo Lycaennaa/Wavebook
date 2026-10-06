@@ -1,7 +1,28 @@
 import AppKit
 import WavebookCore
 
-typealias LibraryRootScanOperation = @MainActor (URL, LibraryDatabase, UUID) async throws -> LibraryScanResult
+struct LibraryRootScanProgress: Equatable, Sendable {
+    let root: URL
+    let completedFileCount: Int
+    let totalFileCount: Int
+}
+
+struct LibraryRootScanFailure: Equatable, Sendable {
+    let root: URL
+}
+
+struct LibraryScanSnapshot: Equatable, Sendable {
+    let isScanning: Bool
+    let progress: LibraryRootScanProgress?
+    let failure: LibraryRootScanFailure?
+}
+
+typealias LibraryRootScanOperation = @MainActor (
+    URL,
+    LibraryDatabase,
+    UUID,
+    @escaping LibraryScanProgressHandler
+) async throws -> LibraryScanResult
 
 @MainActor
 final class LibraryScanCoordinator {
@@ -23,28 +44,43 @@ final class LibraryScanCoordinator {
     private let onEvent: (PlaybackSessionEvent) -> Void
     private let onLibraryChanged: () -> Void
     private let onReplayGainStart: () -> Void
+    private let onScanStateChanged: (LibraryScanSnapshot) -> Void
     private var pendingScans: [String: PendingScan] = [:]
     private var scanTask: Task<Void, Never>?
     private var activeScanKey: String?
     private var scanGenerations: [String: UUID] = [:]
     private var persistedScanBatch: PersistedScanBatch?
     private var rootRemovalGenerations: [String: UUID] = [:]
+    private var latestScanProgress: LibraryRootScanProgress?
+    private var latestScanFailure: LibraryRootScanFailure?
+
+    var isScanning: Bool { activeScanKey != nil || !pendingScans.isEmpty }
+    var snapshot: LibraryScanSnapshot {
+        LibraryScanSnapshot(isScanning: isScanning, progress: latestScanProgress, failure: latestScanFailure)
+    }
 
     convenience init(
         databaseProvider: @escaping () -> LibraryDatabase?,
         scanner: LibraryScanner = LibraryScanner(),
         onEvent: @escaping (PlaybackSessionEvent) -> Void,
         onLibraryChanged: @escaping () -> Void,
-        onReplayGainStart: @escaping () -> Void
+        onReplayGainStart: @escaping () -> Void,
+        onScanStateChanged: @escaping (LibraryScanSnapshot) -> Void = { _ in }
     ) {
         self.init(
             databaseProvider: databaseProvider,
-            scan: { root, database, generation in
-                try await scanner.scan(root: root, database: database, generation: generation)
+            scan: { root, database, generation, progress in
+                try await scanner.scan(
+                    root: root,
+                    database: database,
+                    generation: generation,
+                    progress: progress
+                )
             },
             onEvent: onEvent,
             onLibraryChanged: onLibraryChanged,
-            onReplayGainStart: onReplayGainStart
+            onReplayGainStart: onReplayGainStart,
+            onScanStateChanged: onScanStateChanged
         )
     }
 
@@ -53,13 +89,15 @@ final class LibraryScanCoordinator {
         scan: @escaping LibraryRootScanOperation,
         onEvent: @escaping (PlaybackSessionEvent) -> Void,
         onLibraryChanged: @escaping () -> Void,
-        onReplayGainStart: @escaping () -> Void
+        onReplayGainStart: @escaping () -> Void,
+        onScanStateChanged: @escaping (LibraryScanSnapshot) -> Void = { _ in }
     ) {
         self.databaseProvider = databaseProvider
         self.scan = scan
         self.onEvent = onEvent
         self.onLibraryChanged = onLibraryChanged
         self.onReplayGainStart = onReplayGainStart
+        self.onScanStateChanged = onScanStateChanged
     }
 
     deinit {
@@ -109,6 +147,7 @@ final class LibraryScanCoordinator {
             await scanTask.value
         }
         guard rootRemovalGenerations[root.path] == removalGeneration else { return }
+        clearScanResult(for: root.path)
         do {
             _ = try database.removeRoot(id: root.id)
             rootRemovalGenerations[root.path] = nil
@@ -120,6 +159,13 @@ final class LibraryScanCoordinator {
             onEvent(.error(error, message: "Could not remove library folder", kind: .database))
             scanInBackground(root: root.url, database: database, addingRoot: false)
         }
+    }
+    private func clearScanResult(for rootPath: String) {
+        let hadProgress = latestScanProgress?.root.path == rootPath
+        let hadFailure = latestScanFailure?.root.path == rootPath
+        if hadProgress { latestScanProgress = nil }
+        if hadFailure { latestScanFailure = nil }
+        if hadProgress || hadFailure { onScanStateChanged(snapshot) }
     }
 
     func rescanPersistedRoots(
@@ -163,6 +209,7 @@ final class LibraryScanCoordinator {
     }
 
     func cancel() {
+        let wasScanning = isScanning
         let completion = persistedScanBatch?.completion
         persistedScanBatch = nil
         scanTask?.cancel()
@@ -170,6 +217,7 @@ final class LibraryScanCoordinator {
         activeScanKey = nil
         pendingScans.removeAll()
         scanGenerations.removeAll()
+        if wasScanning { onScanStateChanged(snapshot) }
         // A confirmed root removal resumes after its scan task settles.
         completion?(false)
     }
@@ -192,11 +240,14 @@ final class LibraryScanCoordinator {
                 scanRoot = registeredRoot.url
                 onEvent(.clearOperationalErrors(.database))
             } catch {
+                latestScanFailure = LibraryRootScanFailure(root: root)
+                onScanStateChanged(snapshot)
                 onEvent(.error(error, message: "Could not add library folder", kind: .database))
                 return
             }
         }
 
+        let wasScanning = isScanning
         let key = rootPath
         rootRemovalGenerations[key] = nil
         let generation = UUID()
@@ -211,6 +262,11 @@ final class LibraryScanCoordinator {
             scanTask?.cancel()
         }
         startNextScanIfNeeded()
+        if !wasScanning, isScanning {
+            latestScanProgress = nil
+            latestScanFailure = nil
+            onScanStateChanged(snapshot)
+        }
     }
 
     private func startNextScanIfNeeded() {
@@ -218,10 +274,29 @@ final class LibraryScanCoordinator {
               let key = pendingScans.keys.sorted(by: CatalogFacetOrdering.localizedPathPrecedes).first,
               let request = pendingScans.removeValue(forKey: key) else { return }
         activeScanKey = key
+        if latestScanProgress != nil {
+            latestScanProgress = nil
+            onScanStateChanged(snapshot)
+        }
         let scan = scan
+        let progressRoot = request.root
+        let progressGeneration = request.generation
+        let scanProgress: LibraryScanProgressHandler = { [weak self] completedCount, totalCount in
+            await MainActor.run {
+                guard let self,
+                      self.activeScanKey == key,
+                      self.scanGenerations[key] == progressGeneration else { return }
+                self.latestScanProgress = LibraryRootScanProgress(
+                    root: progressRoot,
+                    completedFileCount: completedCount,
+                    totalFileCount: totalCount
+                )
+                self.onScanStateChanged(self.snapshot)
+            }
+        }
         scanTask = Task(priority: .utility) { [weak self] in
             do {
-                let result = try await scan(request.root, request.database, request.generation)
+                let result = try await scan(request.root, request.database, request.generation, scanProgress)
                 self?.scanCompleted(
                     key: key,
                     generation: request.generation,
@@ -261,9 +336,12 @@ final class LibraryScanCoordinator {
         guard activeScanKey == key else { return }
         scanTask = nil
         activeScanKey = nil
+        var didFail = false
         if scanGenerations[key] == generation {
             scanGenerations[key] = nil
             if let error {
+                latestScanFailure = LibraryRootScanFailure(root: URL(fileURLWithPath: key))
+                didFail = true
                 onEvent(
                     .error(
                         error,
@@ -282,6 +360,7 @@ final class LibraryScanCoordinator {
             finishPersistedScanRoot(key: key, succeeded: error == nil && !wasCancelled)
         }
         startNextScanIfNeeded()
+        if didFail || !isScanning { onScanStateChanged(snapshot) }
     }
 
     private func finishPersistedScanRoot(key: String, succeeded: Bool) {

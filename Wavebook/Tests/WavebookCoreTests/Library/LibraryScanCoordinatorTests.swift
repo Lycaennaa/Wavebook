@@ -21,9 +21,14 @@ final class LibraryScanCoordinatorTests: XCTestCase {
         let scanner = LibraryScanner()
         let coordinator = LibraryScanCoordinator(
             databaseProvider: { database },
-            scan: { root, database, generation in
+            scan: { root, database, generation, progress in
                 try await gate.pauseScan(at: root.path)
-                return try await scanner.scan(root: root, database: database, generation: generation)
+                return try await scanner.scan(
+                    root: root,
+                    database: database,
+                    generation: generation,
+                    progress: progress
+                )
             },
             onEvent: { _ in },
             onLibraryChanged: {},
@@ -42,6 +47,85 @@ final class LibraryScanCoordinatorTests: XCTestCase {
 
         XCTAssertTrue(try database.roots().isEmpty)
         XCTAssertTrue(FileManager.default.fileExists(atPath: root.path))
+    }
+
+    func testAddingMultipleRootsKeepsScanActivityUntilAllScansFinish() async throws {
+        let parent = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Wavebook-\(UUID().uuidString)", isDirectory: true)
+        let roots = [
+            parent.appendingPathComponent("first", isDirectory: true),
+            parent.appendingPathComponent("second", isDirectory: true)
+        ]
+        for root in roots {
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        }
+        defer { try? FileManager.default.removeItem(at: parent) }
+
+        let database = try LibraryDatabase(inMemory: true)
+        let scanCompleted = expectation(description: "Both roots finish scanning")
+        scanCompleted.expectedFulfillmentCount = roots.count
+        var scanStates: [LibraryScanSnapshot] = []
+        let scanner = LibraryScanner()
+        let coordinator = LibraryScanCoordinator(
+            databaseProvider: { database },
+            scan: { root, database, generation, progress in
+                return try await scanner.scan(
+                    root: root,
+                    database: database,
+                    generation: generation,
+                    progress: progress
+                )
+            },
+            onEvent: { _ in },
+            onLibraryChanged: { scanCompleted.fulfill() },
+            onReplayGainStart: {},
+            onScanStateChanged: { snapshot in scanStates.append(snapshot) }
+        )
+
+        coordinator.addRoots(roots)
+        XCTAssertTrue(scanStates.first?.isScanning ?? false)
+        await fulfillment(of: [scanCompleted], timeout: 10)
+
+        let registeredRootNames = try database.roots().map { URL(fileURLWithPath: $0.path).lastPathComponent }
+        XCTAssertEqual(Set(registeredRootNames), Set(["first", "second"]))
+        let finalSnapshot = try XCTUnwrap(scanStates.last)
+        XCTAssertFalse(finalSnapshot.isScanning)
+        XCTAssertEqual(finalSnapshot.progress?.root.lastPathComponent, "second")
+        XCTAssertEqual(finalSnapshot.progress?.completedFileCount, 0)
+        XCTAssertEqual(finalSnapshot.progress?.totalFileCount, 0)
+        XCTAssertEqual(
+            Set(scanStates.compactMap { $0.progress?.root.lastPathComponent }),
+            Set(["first", "second"])
+        )
+    }
+
+    func testScanFailureBeforeProgressIsRetainedInSnapshot() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Wavebook-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("Music", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root.deletingLastPathComponent()) }
+
+        let database = try LibraryDatabase(inMemory: true)
+        let scanEnded = expectation(description: "Failed scan ends without progress")
+        let coordinator = LibraryScanCoordinator(
+            databaseProvider: { database },
+            scan: { _, _, _, _ in throw NSError(domain: "LibraryScanCoordinatorTests", code: 1) },
+            onEvent: { _ in },
+            onLibraryChanged: {},
+            onReplayGainStart: {},
+            onScanStateChanged: { snapshot in
+                if !snapshot.isScanning { scanEnded.fulfill() }
+            }
+        )
+
+        coordinator.addRoots([root])
+        await fulfillment(of: [scanEnded], timeout: 10)
+
+        let snapshot = coordinator.snapshot
+        XCTAssertFalse(snapshot.isScanning)
+        XCTAssertNil(snapshot.progress)
+        XCTAssertEqual(snapshot.failure?.root.lastPathComponent, "Music")
     }
 }
 

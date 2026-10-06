@@ -35,6 +35,7 @@ final class MainViewController: NSViewController {
     var onPageChanged: ((LibraryPage) -> Void)?
     var onPlaylistCatalogChanged: (([Playlist]) -> Void)?
     var onOnboardingRequested: (() -> Void)?
+    var onLibraryScanStateChanged: ((LibraryScanSnapshot) -> Void)?
 
     let songsPage = SongsPageViewController()
     let artistsPage = ArtistsPageViewController()
@@ -141,6 +142,9 @@ final class MainViewController: NSViewController {
             },
             onReplayGainStart: { [weak self] in
                 self?.replayGainAnalysis.start()
+            },
+            onScanStateChanged: { [weak self] snapshot in
+                self?.onLibraryScanStateChanged?(snapshot)
             }
         )
     }()

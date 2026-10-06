@@ -72,6 +72,7 @@
 		1F9D5C3797305D05141172E4 /* CatalogRootTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4130E4BB54D0871DBB68A23B /* CatalogRootTests.swift */; };
 		205B31390E54E59F3B303ABF /* AudioMetadataReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42E6123FA490AF5CDF620066 /* AudioMetadataReaderTests.swift */; };
 		2070D7A23962F47C4B013FA1 /* CatalogQuerySupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4A65DDCA7B4ADF66EA86E58 /* CatalogQuerySupport.swift */; };
+		21A852A90619136F40EA2EA7 /* OnboardingFoldersViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0D460E5D2466AD8D5B4C21B /* OnboardingFoldersViewController.swift */; };
 		234080D2C0E080732FA80BF8 /* ReplayGainTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 268A1907AC6AB569DE44B1F6 /* ReplayGainTests.swift */; };
 		246C4FF864EFE2B6851A161E /* AudioPCMBufferReaderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32B899B21B62EF7B607AF660 /* AudioPCMBufferReaderTests.swift */; };
 		25A492CD683EDD1F7DEAD466 /* LibraryDatabaseRootSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6F8C763DF2D49699847084B /* LibraryDatabaseRootSupport.swift */; };
@@ -224,6 +225,7 @@
 		72F627AF5A63953278A36D5C /* ArtistCollectionItems.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9264B92D1A59FF397CC26E6E /* ArtistCollectionItems.swift */; };
 		7320C83A4B5D241838A27489 /* PlaylistRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69192E9FEABDC5CA480C876F /* PlaylistRepositoryTests.swift */; };
 		7386B4121FAEC57CAEB6B3B3 /* StatisticsRenderDataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6E0212109FF294CD3A0BFA0 /* StatisticsRenderDataTests.swift */; };
+		7493308A0E13EB14C861C65F /* OnboardingFoldersViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0D460E5D2466AD8D5B4C21B /* OnboardingFoldersViewController.swift */; };
 		74EBAB7B56DA49BE90202D96 /* OutputDevices.swift in Sources */ = {isa = PBXBuildFile; fileRef = 078812FC7866B4AC334D071C /* OutputDevices.swift */; };
 		7523D4E51C6F9D04EAC855D2 /* LyricsPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A49C74DF9456501A4556158A /* LyricsPanelController.swift */; };
 		756C1587B2BE948C18944AC8 /* ReplayGain.swift in Sources */ = {isa = PBXBuildFile; fileRef = A16C38B412CE4CA7C6C81FD2 /* ReplayGain.swift */; };
@@ -797,6 +799,7 @@
 		9EBB9D887038497795423085 /* PlaybackTimecodeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackTimecodeTests.swift; sourceTree = "<group>"; };
 		9F0E5972F20889BA37ADD1E5 /* PlaylistPageState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistPageState.swift; sourceTree = "<group>"; };
 		9FB9A8D1809DEE5CD6636F12 /* WavebookCoreTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WavebookCoreTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A0D460E5D2466AD8D5B4C21B /* OnboardingFoldersViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFoldersViewController.swift; sourceTree = "<group>"; };
 		A13CA575429D9C316B242101 /* PlaylistSchemaTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistSchemaTestSupport.swift; sourceTree = "<group>"; };
 		A16C38B412CE4CA7C6C81FD2 /* ReplayGain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReplayGain.swift; sourceTree = "<group>"; };
 		A1C22532CE733FEA70C02D1E /* SkipSegmentEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkipSegmentEditor.swift; sourceTree = "<group>"; };
@@ -1202,6 +1205,7 @@
 			isa = PBXGroup;
 			children = (
 				41464D19B90FCD94056CE9A5 /* OnboardingCopy.swift */,
+				A0D460E5D2466AD8D5B4C21B /* OnboardingFoldersViewController.swift */,
 				3C2953644D12EA2A90D59FDD /* OnboardingLaunchPolicy.swift */,
 				6F6A1A89088819AAE7BF1397 /* OnboardingWelcomeViewController.swift */,
 			);
@@ -1889,6 +1893,7 @@
 				1ED20B1FD3ABF8A4FCA6B4F1 /* MainWindowController.swift in Sources */,
 				C8BD571CF56342EF41476AC4 /* Navigation.swift in Sources */,
 				5D77D41FEA24B9C8C04EADAE /* OnboardingCopy.swift in Sources */,
+				7493308A0E13EB14C861C65F /* OnboardingFoldersViewController.swift in Sources */,
 				87CA236E5C0EB961A46C7B6F /* OnboardingLaunchPolicy.swift in Sources */,
 				AE669DC43CEB2C265B5D5249 /* OnboardingWelcomeViewController.swift in Sources */,
 				F915FC8EE78356ED3F3919DB /* OperationalErrorKind.swift in Sources */,
@@ -2286,6 +2291,7 @@
 				C86682419D9C8DD58D2504E4 /* MainWindowController.swift in Sources */,
 				D9402372CCF8EDA4D0E23000 /* Navigation.swift in Sources */,
 				ED63F6C5993FD772DEBE008E /* OnboardingCopy.swift in Sources */,
+				21A852A90619136F40EA2EA7 /* OnboardingFoldersViewController.swift in Sources */,
 				C7D11E614134B076CD5E7949 /* OnboardingLaunchPolicy.swift in Sources */,
 				1656F148CCB7ED8A494DDB63 /* OnboardingWelcomeViewController.swift in Sources */,
 				ECD5387F62469108DD833BF0 /* OperationalErrorKind.swift in Sources */,

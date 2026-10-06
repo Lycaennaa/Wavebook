@@ -11,9 +11,12 @@ struct BoundedTaskRunner {
         let operation: @Sendable (Item) async throws -> Result
         let collectResults: Bool
         let shouldScheduleNext: @Sendable (Result) -> Bool
+        let progress: (@Sendable (Int, Int) async -> Void)?
+        let totalCount: Int?
     }
     private struct RunState<Result: Sendable>: Sendable {
         var activeCount = 0
+        var completedCount = 0
         var results = [Result]()
         var scheduleMoreTasks = true
     }
@@ -22,6 +25,7 @@ struct BoundedTaskRunner {
         maximumConcurrentCount: Int,
         priority: TaskPriority? = nil,
         cancellationCheck: @escaping @Sendable () throws -> Void = {},
+        progress: (@Sendable (Int, Int) async -> Void)? = nil,
         operation: @escaping @Sendable (Item) async throws -> Result
     ) async throws -> [Result] {
         let iterator = BoundedTaskIterator(items)
@@ -32,7 +36,9 @@ struct BoundedTaskRunner {
             next: { iterator.next() },
             operation: operation,
             collectResults: true,
-            shouldScheduleNext: { _ in true }
+            shouldScheduleNext: { _ in true },
+            progress: progress,
+            totalCount: items.count
         )
         return try await runImpl(request: request)
     }
@@ -51,7 +57,9 @@ struct BoundedTaskRunner {
             next: next,
             operation: operation,
             collectResults: true,
-            shouldScheduleNext: { _ in true }
+            shouldScheduleNext: { _ in true },
+            progress: nil,
+            totalCount: nil
         )
         return try await runImpl(request: request)
     }
@@ -81,7 +89,9 @@ struct BoundedTaskRunner {
                 case .failure:
                     return false
                 }
-            }
+            },
+            progress: nil,
+            totalCount: nil
         )
         return try await runImpl(request: request)
     }
@@ -100,7 +110,9 @@ struct BoundedTaskRunner {
             next: next,
             operation: operation,
             collectResults: false,
-            shouldScheduleNext: { _ in true }
+            shouldScheduleNext: { _ in true },
+            progress: nil,
+            totalCount: nil
         )
         _ = try await runImpl(request: request)
     }
@@ -134,6 +146,13 @@ struct BoundedTaskRunner {
                 }
                 guard let result else { break }
                 state.activeCount -= 1
+                state.completedCount += 1
+                if let progress = request.progress, let totalCount = request.totalCount {
+                    let interval = max(totalCount / 100, 1)
+                    if state.completedCount.isMultiple(of: interval) || state.completedCount == totalCount {
+                        await progress(state.completedCount, totalCount)
+                    }
+                }
                 try processTaskResult(
                     result,
                     request: request,
