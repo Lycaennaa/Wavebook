@@ -1,6 +1,8 @@
 import AppKit
 import WavebookCore
 
+typealias LibraryRootScanOperation = @MainActor (URL, LibraryDatabase, UUID) async throws -> LibraryScanResult
+
 @MainActor
 final class LibraryScanCoordinator {
     private struct PendingScan {
@@ -17,7 +19,7 @@ final class LibraryScanCoordinator {
     }
 
     private let databaseProvider: () -> LibraryDatabase?
-    private let scanner: LibraryScanner
+    private let scan: LibraryRootScanOperation
     private let onEvent: (PlaybackSessionEvent) -> Void
     private let onLibraryChanged: () -> Void
     private let onReplayGainStart: () -> Void
@@ -26,16 +28,35 @@ final class LibraryScanCoordinator {
     private var activeScanKey: String?
     private var scanGenerations: [String: UUID] = [:]
     private var persistedScanBatch: PersistedScanBatch?
+    private var rootRemovalGenerations: [String: UUID] = [:]
 
-    init(
+    convenience init(
         databaseProvider: @escaping () -> LibraryDatabase?,
         scanner: LibraryScanner = LibraryScanner(),
         onEvent: @escaping (PlaybackSessionEvent) -> Void,
         onLibraryChanged: @escaping () -> Void,
         onReplayGainStart: @escaping () -> Void
     ) {
+        self.init(
+            databaseProvider: databaseProvider,
+            scan: { root, database, generation in
+                try await scanner.scan(root: root, database: database, generation: generation)
+            },
+            onEvent: onEvent,
+            onLibraryChanged: onLibraryChanged,
+            onReplayGainStart: onReplayGainStart
+        )
+    }
+
+    init(
+        databaseProvider: @escaping () -> LibraryDatabase?,
+        scan: @escaping LibraryRootScanOperation,
+        onEvent: @escaping (PlaybackSessionEvent) -> Void,
+        onLibraryChanged: @escaping () -> Void,
+        onReplayGainStart: @escaping () -> Void
+    ) {
         self.databaseProvider = databaseProvider
-        self.scanner = scanner
+        self.scan = scan
         self.onEvent = onEvent
         self.onLibraryChanged = onLibraryChanged
         self.onReplayGainStart = onReplayGainStart
@@ -46,15 +67,56 @@ final class LibraryScanCoordinator {
     }
 
     func addRoot() {
-        guard let database = databaseProvider() else { return }
+        guard databaseProvider() != nil else { return }
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = true
         panel.prompt = "Add"
         guard panel.runModal() == .OK else { return }
-        for url in panel.urls {
-            scanInBackground(root: url, database: database, addingRoot: true)
+        addRoots(panel.urls)
+    }
+
+    func libraryRoots() -> [LibraryRoot] {
+        guard let database = databaseProvider() else { return [] }
+        do {
+            let roots = try database.roots()
+            onEvent(.clearOperationalErrors(.database))
+            return roots
+        } catch {
+            onEvent(.error(error, message: "Could not load library folders", kind: .database))
+            return []
+        }
+    }
+
+    func addRoots(_ roots: [URL]) {
+        guard let database = databaseProvider() else { return }
+        for root in roots {
+            scanInBackground(root: root, database: database, addingRoot: true)
+        }
+    }
+
+    func removeRoot(_ root: LibraryRoot) async {
+        guard let database = databaseProvider() else { return }
+        let removalGeneration = UUID()
+        rootRemovalGenerations[root.path] = removalGeneration
+        pendingScans[root.path] = nil
+        scanGenerations[root.path] = nil
+        if activeScanKey == root.path, let scanTask {
+            scanTask.cancel()
+            await scanTask.value
+        }
+        guard rootRemovalGenerations[root.path] == removalGeneration else { return }
+        do {
+            _ = try database.removeRoot(id: root.id)
+            rootRemovalGenerations[root.path] = nil
+            finishPersistedScanRoot(key: root.path, succeeded: true)
+            onEvent(.clearOperationalErrors(.database))
+            onLibraryChanged()
+        } catch {
+            rootRemovalGenerations[root.path] = nil
+            onEvent(.error(error, message: "Could not remove library folder", kind: .database))
+            scanInBackground(root: root.url, database: database, addingRoot: false)
         }
     }
 
@@ -106,6 +168,7 @@ final class LibraryScanCoordinator {
         activeScanKey = nil
         pendingScans.removeAll()
         scanGenerations.removeAll()
+        // A confirmed root removal resumes after its scan task settles.
         completion?(false)
     }
 
@@ -115,10 +178,16 @@ final class LibraryScanCoordinator {
         addingRoot: Bool,
         startReplayGain: Bool = true
     ) {
-        let root = root.standardizedFileURL
+        var scanRoot = root
+        var rootPath = root.path
         if addingRoot {
             do {
-                _ = try database.addRoot(path: root.path)
+                let rootID = try database.addRoot(path: root.path)
+                guard let registeredRoot = try database.roots().first(where: { $0.id == rootID }) else {
+                    throw LibraryDatabaseError.missingRoot(String(rootID))
+                }
+                rootPath = registeredRoot.path
+                scanRoot = registeredRoot.url
                 onEvent(.clearOperationalErrors(.database))
             } catch {
                 onEvent(.error(error, message: "Could not add library folder", kind: .database))
@@ -126,11 +195,12 @@ final class LibraryScanCoordinator {
             }
         }
 
-        let key = root.path
+        let key = rootPath
+        rootRemovalGenerations[key] = nil
         let generation = UUID()
         scanGenerations[key] = generation
         pendingScans[key] = PendingScan(
-            root: root,
+            root: scanRoot,
             database: database,
             generation: generation,
             startReplayGain: startReplayGain
@@ -146,14 +216,10 @@ final class LibraryScanCoordinator {
               let key = pendingScans.keys.sorted(by: CatalogFacetOrdering.localizedPathPrecedes).first,
               let request = pendingScans.removeValue(forKey: key) else { return }
         activeScanKey = key
-        let scanner = scanner
+        let scan = scan
         scanTask = Task(priority: .utility) { [weak self] in
             do {
-                let result = try await scanner.scan(
-                    root: request.root,
-                    database: request.database,
-                    generation: request.generation
-                )
+                let result = try await scan(request.root, request.database, request.generation)
                 self?.scanCompleted(
                     key: key,
                     generation: request.generation,

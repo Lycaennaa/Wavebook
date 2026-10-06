@@ -18,6 +18,14 @@ extension MainViewController {
         audioSettings.showSettings(
             owner: self,
             analysis: replayGainAnalysis,
+            libraryFolders: LibraryFolderSettingsActions(
+                roots: { [weak self] in self?.libraryScan.libraryRoots() ?? [] },
+                add: { [weak self] roots in self?.libraryScan.addRoots(roots) },
+                remove: { [weak self] root in
+                    guard let self else { return }
+                    await self.libraryScan.removeRoot(root)
+                }
+            ),
             reactivate: { [weak self] in self?.navigation.reactivateCurrentPage() }
         )
     }

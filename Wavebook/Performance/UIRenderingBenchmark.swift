@@ -76,7 +76,7 @@ enum UIRenderingBenchmark {
         try await measure(
             scenario: "ui-settings-panel-draw",
             description: "Offscreen-rasterize settings panel controls and status text",
-            size: NSSize(width: 620, height: 760),
+            size: NSSize(width: 620, height: 900),
             snapshots: 8,
             makeTarget: UIRenderingViewFixtures.settingsPanel
         )

@@ -9,6 +9,7 @@ The following describes capabilities visible in the current source tree. Listed 
 ## Library and discovery
 
 - Add one or more local folders and scan files with `mp3`, `flac`, `opus`, `m4a`, `aac`, `wav`, `aif`, `aiff`, `aifc`, and `caf` filename extensions.
+- Manage library folders in Settings; removing a folder removes its indexed tracks from Wavebook without deleting files from disk.
 - Browse and search songs, artists, albums, and genres; navigate between related catalog entries.
 - Read audio metadata and display embedded artwork or supported sidecar images named `cover`, `folder`, or `front`.
 

@@ -183,6 +183,7 @@ final class AudioSettingsCoordinator {
     func showSettings(
         owner: NSViewController,
         analysis: ReplayGainAnalysisCoordinator,
+        libraryFolders: LibraryFolderSettingsActions,
         reactivate: @escaping () -> Void
     ) {
         settingsPanelBinder.configure(.init(
@@ -201,21 +202,15 @@ final class AudioSettingsCoordinator {
             onSkipSilentSegmentsChanged: { [weak self] enabled in
                 self?.playbackTransport.setSkipSilentSegments(enabled) ?? false
             },
+            libraryFolders: libraryFolders,
             reactivate: reactivate
         ))
     }
 
-    func showReplayGainActionError(
-        _ message: String,
-        owner: NSViewController,
-        analysis: ReplayGainAnalysisCoordinator,
-        reactivate: @escaping () -> Void
-    ) {
+    func showReplayGainActionError(_ message: String) {
         Self.logger.error("ReplayGain action failed: \(message, privacy: .public)")
-        showSettings(owner: owner, analysis: analysis, reactivate: reactivate)
         settingsPanelBinder.showReplayGainActionError(message)
     }
-
     private func report(_ error: Error, message: String, kind: OperationalErrorKind) {
         onEvent(.error(error, message: message, kind: kind))
     }

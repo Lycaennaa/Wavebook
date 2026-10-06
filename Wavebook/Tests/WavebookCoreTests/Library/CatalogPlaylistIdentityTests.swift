@@ -438,4 +438,35 @@ extension CatalogPlaylistIdentityTests {
             )
         }
     }
+    func testRemovingRootPreservesFilesAndPlaylistIdentity() throws {
+        let root = try makeRoot(named: "root-removal")
+        let path = root.appendingPathComponent("song.flac").path
+        try Data().write(to: URL(fileURLWithPath: path))
+        let database = try LibraryDatabase(inMemory: true)
+        let rootID = try database.addRoot(path: root.path)
+        let track = Track(
+            path: path,
+            title: "Song",
+            artistDisplay: "Artist",
+            albumTitle: "Album",
+            fileResourceIdentifier: "resource-1",
+            fileVolumeIdentifier: "volume-1"
+        )
+        let trackID = try database.save(track: track, rootID: rootID)
+        try insertPlaylistItem(in: database, trackID: trackID, snapshotPath: path)
+
+        XCTAssertTrue(try database.removeRoot(id: rootID))
+        XCTAssertTrue(try database.roots().isEmpty)
+        XCTAssertTrue(try database.tracks().isEmpty)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: path))
+        let orphanedItem = try playlistItemState(in: database)
+        XCTAssertNil(orphanedItem.trackID)
+        XCTAssertEqual(orphanedItem.sourceVolumeIdentifier, "volume-1")
+        XCTAssertEqual(orphanedItem.sourceResourceIdentifier, "resource-1")
+
+        let restoredRootID = try database.addRoot(path: root.path)
+        let restoredTrackID = try database.save(track: track, rootID: restoredRootID)
+        XCTAssertEqual(try playlistItemState(in: database).trackID, restoredTrackID)
+        XCTAssertFalse(try database.removeRoot(id: rootID))
+    }
 }

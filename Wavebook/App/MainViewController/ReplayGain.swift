@@ -38,11 +38,7 @@ extension MainViewController {
     }
 
     func showReplayGainActionError(_ message: String) {
-        audioSettings.showReplayGainActionError(
-            message,
-            owner: self,
-            analysis: replayGainAnalysis,
-            reactivate: { [weak self] in self?.navigation.reactivateCurrentPage() }
-        )
+        showSettings()
+        audioSettings.showReplayGainActionError(message)
     }
 }

@@ -357,6 +357,36 @@ extension LibraryDatabase {
             }
         }
     }
+    /// Removes a library root and its indexed catalog data.
+    @discardableResult
+    public func removeRoot(id: Int64) throws -> Bool {
+        try writer.write { database in
+            guard try Int64.fetchOne(
+                database,
+                sql: "SELECT id FROM roots WHERE id = ?",
+                arguments: [id]
+            ) != nil else { return false }
+            let tracks = try Row.fetchCursor(
+                database,
+                sql: "SELECT id, albumTitle, albumArtist, artistDisplay FROM tracks WHERE rootId = ?",
+                arguments: [id]
+            )
+            var albumKeys = Set<AlbumKey>()
+            while let row = try tracks.next() {
+                try Self.checkCatalogCancellation()
+                if let albumKey = Self.albumKey(from: row) {
+                    albumKeys.insert(albumKey)
+                }
+                let trackID: Int64 = row["id"]
+                try Self.deleteTrackPreservingPlaylistIdentity(trackID: trackID, db: database)
+            }
+            try Self.reattachOrphanedPlaylistItems(db: database)
+            try Self.invalidateAlbumValues(for: albumKeys, db: database)
+            try database.execute(sql: "DELETE FROM roots WHERE id = ?", arguments: [id])
+            try Self.deleteOrphanNames(database: database)
+            return true
+        }
+    }
 
     private static func rootPathsOverlap(_ lhs: RootPathIdentity, _ rhs: RootPathIdentity) -> Bool {
         rootPathIdentityMatches(lhs, rhs) || rootContains(lhs, rhs) || rootContains(rhs, lhs)

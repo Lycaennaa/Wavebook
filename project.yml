@@ -156,6 +156,7 @@ targets:
       - path: Wavebook/App/Playback/PlaybackQueueCoordinator.swift
       - path: Wavebook/App/Playback/PlaybackPresentationState.swift
       - path: Wavebook/App/Notifications/OperationalErrorKind.swift
+      - path: Wavebook/App/Library/LibraryScanCoordinator.swift
       - path: Wavebook/App/SongList/SongListPaginationPolicy.swift
       - path: Wavebook/App/StatisticsHeatmapView.swift
       - path: Wavebook/App/AppTheme.swift

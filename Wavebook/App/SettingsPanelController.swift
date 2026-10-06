@@ -26,6 +26,7 @@ final class SettingsPanelController: NSWindowController, NSWindowDelegate {
     private let cancelAnalysisButton = NSButton(title: "Cancel", target: nil, action: nil)
     private let rescanAllButton = NSButton(title: "Rescan All", target: nil, action: nil)
     private let separator = NSBox()
+    private let libraryFoldersView = LibraryFoldersSettingsView(frame: .zero)
     private var replayGainService: ReplayGainAnalysisService?
     private var refreshTask: Task<Void, Never>?
     private var actionTask: Task<Void, Never>?
@@ -34,7 +35,7 @@ final class SettingsPanelController: NSWindowController, NSWindowDelegate {
 
     init() {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 620, height: 760),
+            contentRect: NSRect(x: 0, y: 0, width: 620, height: 900),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -93,6 +94,9 @@ final class SettingsPanelController: NSWindowController, NSWindowDelegate {
             ? "Follows system output"
             : "Uses this output until the system output changes"
     }
+    func configureLibraryFolders(_ actions: LibraryFolderSettingsActions) {
+        libraryFoldersView.configure(actions)
+    }
     private func setAppearance(_ appearance: AppAppearance) {
         guard let index = appearancePopup.itemArray.firstIndex(where: { item in
             guard let itemAppearance = item.representedObject as? AppAppearance else { return false }
@@ -129,7 +133,7 @@ extension SettingsPanelController {
     private func makeContentView() -> NSView {
         let root = ThemeBackgroundView()
         let failuresScrollView = makeFailuresScrollView()
-        let views = makeAppearanceViews() + makeOutputViews()
+        let views = makeAppearanceViews() + [libraryFoldersView] + makeOutputViews()
         let analysisViews = makeAnalysisViews(failuresScrollView: failuresScrollView)
         let stack = NSStackView(views: views + analysisViews)
         stack.orientation = .vertical
@@ -147,6 +151,8 @@ extension SettingsPanelController {
             popup.widthAnchor.constraint(equalTo: stack.widthAnchor),
             hiddenUIDField.widthAnchor.constraint(equalTo: stack.widthAnchor),
             skipSilentSegmentsButton.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            libraryFoldersView.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            libraryFoldersView.heightAnchor.constraint(equalToConstant: 212),
             separator.widthAnchor.constraint(equalTo: stack.widthAnchor),
             analysisStatusLabel.widthAnchor.constraint(equalTo: stack.widthAnchor),
             analysisCountsLabel.widthAnchor.constraint(equalTo: stack.widthAnchor),
