@@ -65,15 +65,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func showOnboarding(_ sender: Any?) {
         windowController?.showOnboarding()
     }
-#if DEBUG
-    @objc private func chooseOnboardingCopyFile(_ sender: Any?) {
-        windowController?.chooseOnboardingCopyFile()
-    }
-
-    @objc private func reloadOnboardingCopy(_ sender: Any?) {
-        windowController?.reloadOnboardingCopy()
-    }
-#endif
 
     private func installMainMenu() {
         let mainMenu = NSMenu()
@@ -149,23 +140,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             keyEquivalent: ""
         )
         onboardingItem.target = self
-#if DEBUG
-        menu.addItem(.separator())
-        let chooseCopyItem = NSMenuItem(
-            title: "Choose Onboarding Copy File…",
-            action: #selector(chooseOnboardingCopyFile(_:)),
-            keyEquivalent: ""
-        )
-        chooseCopyItem.target = self
-        menu.addItem(chooseCopyItem)
-        let reloadCopyItem = NSMenuItem(
-            title: "Reload Onboarding Copy",
-            action: #selector(reloadOnboardingCopy(_:)),
-            keyEquivalent: ""
-        )
-        reloadCopyItem.target = self
-        menu.addItem(reloadCopyItem)
-#endif
         menu.addItem(onboardingItem)
         return menu
     }

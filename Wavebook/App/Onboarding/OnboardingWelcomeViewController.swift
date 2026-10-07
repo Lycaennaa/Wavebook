@@ -2,7 +2,6 @@ import AppKit
 
 @MainActor
 final class OnboardingWelcomeViewController: NSViewController {
-    private var copy: OnboardingCopy
     private let onChooseFolders: () -> Void
     private let onExit: () -> Void
     private let titleLabel = NSTextField(labelWithString: "")
@@ -12,8 +11,7 @@ final class OnboardingWelcomeViewController: NSViewController {
     private let chooseFoldersButton = NSButton(title: "", target: nil, action: nil)
     private let exitButton = NSButton(title: "", target: nil, action: nil)
 
-    init(copy: OnboardingCopy, onChooseFolders: @escaping () -> Void, onExit: @escaping () -> Void) {
-        self.copy = copy
+    init(onChooseFolders: @escaping () -> Void, onExit: @escaping () -> Void) {
         self.onChooseFolders = onChooseFolders
         self.onExit = onExit
         super.init(nibName: nil, bundle: nil)
@@ -56,7 +54,16 @@ final class OnboardingWelcomeViewController: NSViewController {
         exitButton.action = #selector(exitOnboarding(_:))
         exitButton.bezelStyle = .rounded
 
-        applyCopy()
+        titleLabel.stringValue = "Welcome to Wavebook"
+        libraryDescription.stringValue = "Browse by song, artist, album, or genre."
+        featureDescription.stringValue = "Adjust playback with the equalizer and ReplayGain. "
+            + "With offline lyrics and optional online search."
+        folderAccessDescription.stringValue = "Wavebook scans only selected folders. "
+            + "Audio files are not moved or deleted."
+        chooseFoldersButton.title = "Choose Music Folders…"
+        chooseFoldersButton.setAccessibilityHelp("Choose one or more local folders to scan.")
+        exitButton.title = "Exit Onboarding"
+        exitButton.setAccessibilityHelp("Open Wavebook without selecting music folders.")
 
         let buttons = NSStackView(views: [chooseFoldersButton, exitButton])
         buttons.orientation = .vertical
@@ -80,23 +87,6 @@ final class OnboardingWelcomeViewController: NSViewController {
             content.widthAnchor.constraint(lessThanOrEqualToConstant: 600)
         ])
         view = root
-    }
-
-    func update(copy: OnboardingCopy) {
-        self.copy = copy
-        guard isViewLoaded else { return }
-        applyCopy()
-    }
-
-    private func applyCopy() {
-        titleLabel.stringValue = copy.welcome.title
-        libraryDescription.stringValue = copy.welcome.libraryDescription
-        featureDescription.stringValue = copy.welcome.featureDescription
-        folderAccessDescription.stringValue = copy.welcome.folderAccessDescription
-        chooseFoldersButton.title = copy.welcome.chooseFoldersButtonTitle
-        chooseFoldersButton.setAccessibilityHelp(copy.welcome.chooseFoldersAccessibilityHelp)
-        exitButton.title = copy.welcome.exitButtonTitle
-        exitButton.setAccessibilityHelp(copy.welcome.exitAccessibilityHelp)
     }
 
     @objc private func chooseFolders(_ sender: Any?) {

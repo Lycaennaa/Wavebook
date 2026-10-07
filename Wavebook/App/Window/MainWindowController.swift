@@ -112,16 +112,6 @@ final class MainWindowController: NSWindowController {
         root.showOnboarding()
     }
 
-#if DEBUG
-    func chooseOnboardingCopyFile() {
-        root.chooseOnboardingCopyFile()
-    }
-
-    func reloadOnboardingCopy() {
-        root.reloadOnboardingCopy()
-    }
-#endif
-
     func prepareForTermination(completion: @escaping @MainActor (Bool) -> Void) {
         root.prepareForTermination(completion: completion)
     }

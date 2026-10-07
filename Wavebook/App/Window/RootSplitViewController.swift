@@ -1,5 +1,4 @@
 import AppKit
-import UniformTypeIdentifiers
 import WavebookCore
 
 final class RootSplitViewController: NSViewController {
@@ -20,17 +19,10 @@ final class RootSplitViewController: NSViewController {
     }
 
     private var onboardingStep: OnboardingStep?
-    private var onboardingCopy = OnboardingCopy.bundled()
-#if DEBUG
-    private static let onboardingCopyPathKey = "Wavebook.debugOnboardingCopyPath"
-#endif
 
     init(searchField: NSSearchField) {
         mainController = MainViewController(searchField: searchField)
         super.init(nibName: nil, bundle: nil)
-#if DEBUG
-        loadSavedOnboardingCopy()
-#endif
     }
 
     @available(*, unavailable)
@@ -103,7 +95,6 @@ final class RootSplitViewController: NSViewController {
 
     private func showOnboardingWelcome() {
         let controller = OnboardingWelcomeViewController(
-            copy: onboardingCopy,
             onChooseFolders: { [weak self] in self?.showOnboardingFolders() },
             onExit: { [weak self] in self?.showLibrary() }
         )
@@ -171,57 +162,6 @@ final class RootSplitViewController: NSViewController {
         controller.removeFromParent()
         self.onboardingStep = nil
     }
-#if DEBUG
-    func chooseOnboardingCopyFile() {
-        guard let window = view.window else { return }
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
-        panel.allowedContentTypes = [.json]
-        panel.prompt = "Load Copy"
-        panel.beginSheetModal(for: window) { [weak self] response in
-            guard response == .OK, let url = panel.url else { return }
-            self?.loadOnboardingCopy(from: url)
-        }
-    }
-
-    func reloadOnboardingCopy() {
-        guard let path = UserDefaults.standard.string(forKey: Self.onboardingCopyPathKey),
-              FileManager.default.fileExists(atPath: path) else {
-            chooseOnboardingCopyFile()
-            return
-        }
-        loadOnboardingCopy(from: URL(fileURLWithPath: path))
-    }
-
-    private func loadSavedOnboardingCopy() {
-        guard let path = UserDefaults.standard.string(forKey: Self.onboardingCopyPathKey),
-              let copy = try? OnboardingCopy.load(from: URL(fileURLWithPath: path)) else { return }
-        onboardingCopy = copy
-    }
-
-    private func loadOnboardingCopy(from url: URL) {
-        do {
-            let copy = try OnboardingCopy.load(from: url)
-            onboardingCopy = copy
-            UserDefaults.standard.set(url.path, forKey: Self.onboardingCopyPathKey)
-            if case let .welcome(controller) = onboardingStep {
-                controller.update(copy: copy)
-            }
-        } catch {
-            let alert = NSAlert()
-            alert.messageText = "Could not load onboarding copy"
-            alert.informativeText = error.localizedDescription
-            alert.alertStyle = .warning
-            if let window = view.window {
-                alert.beginSheetModal(for: window, completionHandler: nil)
-            } else {
-                alert.runModal()
-            }
-        }
-    }
-#endif
 
     func prepareForTermination(completion: @escaping @MainActor (Bool) -> Void) {
         mainController.finalizeForTermination(completion: completion)
