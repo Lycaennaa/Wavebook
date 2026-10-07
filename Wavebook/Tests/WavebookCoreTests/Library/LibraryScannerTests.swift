@@ -40,14 +40,16 @@ extension LibraryScannerTests {
         XCTAssertEqual(try database.tracks().map(\.title), ["One"])
     }
 
-    func testScanReportsCandidateProgressAgainstKnownTotal() async throws {
+    func testScanReportsAudioProgressAndMatchedLyrics() async throws {
         let root = try makeRoot()
         try writeWAV(to: root.appending(path: "One.wav"))
         try writeWAV(to: root.appending(path: "Two.wav"))
+        try Data("[00:00.00]One\n".utf8).write(to: root.appending(path: "One.lrc"))
+        try Data("[00:00.00]Two\n".utf8).write(to: root.appending(path: "Two.lrc"))
         let recorder = LibraryScanProgressRecorder()
         let database = try LibraryDatabase(inMemory: true)
 
-        try await LibraryScanner().scan(
+        let result = try await LibraryScanner().scan(
             root: root,
             database: database,
             progress: { completedCount, totalCount in
@@ -57,6 +59,7 @@ extension LibraryScannerTests {
 
         let progressUpdates = await recorder.snapshot()
         XCTAssertEqual(progressUpdates, ["0/2", "1/2", "2/2"])
+        XCTAssertEqual(result.tracks.lazy.filter(\.hasLyrics).count, 2)
     }
 
     func testUnchangedAliasCannotHideAnotherDeletedTrack() async throws {
@@ -296,9 +299,11 @@ extension LibraryScannerTests {
         let root = try makeRoot()
         let audio = root.appending(path: "One.wav")
         try writeWAV(to: audio)
+        try Data("[00:00.00]One\n".utf8).write(to: root.appending(path: "One.lrc"))
         let database = try LibraryDatabase(inMemory: true)
         let scanner = LibraryScanner()
-        try await scanner.scan(root: root, database: database)
+        let initialResult = try await scanner.scan(root: root, database: database)
+        XCTAssertEqual(initialResult.matchedLyricTrackCount, 1)
 
         let trackID = try XCTUnwrap(database.tracks().first?.id)
         let pending = try XCTUnwrap(database.claimNextPendingReplayGainItem())
@@ -322,9 +327,12 @@ extension LibraryScannerTests {
         let result = try await scanner.scan(root: root, database: database)
 
         XCTAssertEqual(result.failedCandidateCount, 1)
+        XCTAssertTrue(result.tracks.isEmpty)
+        XCTAssertEqual(result.matchedLyricTrackCount, 1)
         let retainedTrack = try XCTUnwrap(database.tracks().first)
         XCTAssertEqual(retainedTrack.id, trackID)
         XCTAssertEqual(retainedTrack.title, "One")
+        XCTAssertTrue(retainedTrack.hasLyrics)
         let updatedData = try XCTUnwrap(database.replayGainData(trackID: trackID))
         XCTAssertEqual(updatedData.state, .pending)
         XCTAssertNil(updatedData.track)

@@ -33,6 +33,24 @@ extension LibraryDatabase {
         }
     }
 
+    func matchedLyricTrackCount(rootPath: String) throws -> Int {
+        try readCatalog { database in
+            guard let rootID = try Self.rootID(matching: rootPath, db: database) else { return 0 }
+            return try Int.fetchOne(
+                database,
+                sql: """
+                    SELECT COUNT(*)
+                    FROM tracks
+                    WHERE tracks.rootId = ?
+                      AND EXISTS (
+                          SELECT 1 FROM lyricFiles WHERE lyricFiles.lyricsKey = tracks.lyricsKey
+                      )
+                    """,
+                arguments: [rootID]
+            ) ?? 0
+        }
+    }
+
     func completeUnchangedScan(rootPath: String, lyricFiles: [URL]) throws -> Bool {
         let requestedRootPath = try Self.resolveRootPath(rootPath)
         let discoveredLyricPaths = try Set(lyricFiles.map { url in

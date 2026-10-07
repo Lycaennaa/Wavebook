@@ -5,16 +5,35 @@ struct LibraryRootScanProgress: Equatable, Sendable {
     let root: URL
     let completedFileCount: Int
     let totalFileCount: Int
+    let matchedLyricTrackCount: Int?
 }
 
 struct LibraryRootScanFailure: Equatable, Sendable {
     let root: URL
 }
 
+struct LibraryRootMatchedLyricsCount: Equatable, Sendable {
+    let root: URL
+    let matchedLyricTrackCount: Int?
+}
+
 struct LibraryScanSnapshot: Equatable, Sendable {
     let isScanning: Bool
     let progress: LibraryRootScanProgress?
+    let lastCompletedMatchedLyricsCount: LibraryRootMatchedLyricsCount?
     let failure: LibraryRootScanFailure?
+
+    init(
+        isScanning: Bool,
+        progress: LibraryRootScanProgress?,
+        lastCompletedMatchedLyricsCount: LibraryRootMatchedLyricsCount? = nil,
+        failure: LibraryRootScanFailure?
+    ) {
+        self.isScanning = isScanning
+        self.progress = progress
+        self.lastCompletedMatchedLyricsCount = lastCompletedMatchedLyricsCount
+        self.failure = failure
+    }
 }
 
 typealias LibraryRootScanOperation = @MainActor (
@@ -52,11 +71,17 @@ final class LibraryScanCoordinator {
     private var persistedScanBatch: PersistedScanBatch?
     private var rootRemovalGenerations: [String: UUID] = [:]
     private var latestScanProgress: LibraryRootScanProgress?
+    private var latestCompletedMatchedLyricsCount: LibraryRootMatchedLyricsCount?
     private var latestScanFailure: LibraryRootScanFailure?
 
     var isScanning: Bool { activeScanKey != nil || !pendingScans.isEmpty }
     var snapshot: LibraryScanSnapshot {
-        LibraryScanSnapshot(isScanning: isScanning, progress: latestScanProgress, failure: latestScanFailure)
+        LibraryScanSnapshot(
+            isScanning: isScanning,
+            progress: latestScanProgress,
+            lastCompletedMatchedLyricsCount: latestCompletedMatchedLyricsCount,
+            failure: latestScanFailure
+        )
     }
 
     convenience init(
@@ -117,18 +142,6 @@ final class LibraryScanCoordinator {
         return true
     }
 
-    func libraryRoots() -> [LibraryRoot] {
-        guard let database = databaseProvider() else { return [] }
-        do {
-            let roots = try database.roots()
-            onEvent(.clearOperationalErrors(.database))
-            return roots
-        } catch {
-            onEvent(.error(error, message: "Could not load library folders", kind: .database))
-            return []
-        }
-    }
-
     func addRoots(_ roots: [URL]) {
         guard let database = databaseProvider() else { return }
         for root in roots {
@@ -154,6 +167,7 @@ final class LibraryScanCoordinator {
             finishPersistedScanRoot(key: root.path, succeeded: true)
             onEvent(.clearOperationalErrors(.database))
             onLibraryChanged()
+            onScanStateChanged(snapshot)
         } catch {
             rootRemovalGenerations[root.path] = nil
             onEvent(.error(error, message: "Could not remove library folder", kind: .database))
@@ -162,10 +176,12 @@ final class LibraryScanCoordinator {
     }
     private func clearScanResult(for rootPath: String) {
         let hadProgress = latestScanProgress?.root.path == rootPath
+        let hadCompletedCount = latestCompletedMatchedLyricsCount?.root.path == rootPath
         let hadFailure = latestScanFailure?.root.path == rootPath
         if hadProgress { latestScanProgress = nil }
+        if hadCompletedCount { latestCompletedMatchedLyricsCount = nil }
         if hadFailure { latestScanFailure = nil }
-        if hadProgress || hadFailure { onScanStateChanged(snapshot) }
+        if hadProgress || hadCompletedCount || hadFailure { onScanStateChanged(snapshot) }
     }
 
     func rescanPersistedRoots(
@@ -281,22 +297,15 @@ final class LibraryScanCoordinator {
         let scan = scan
         let progressRoot = request.root
         let progressGeneration = request.generation
-        let scanProgress: LibraryScanProgressHandler = { [weak self] completedCount, totalCount in
-            await MainActor.run {
-                guard let self,
-                      self.activeScanKey == key,
-                      self.scanGenerations[key] == progressGeneration else { return }
-                self.latestScanProgress = LibraryRootScanProgress(
-                    root: progressRoot,
-                    completedFileCount: completedCount,
-                    totalFileCount: totalCount
-                )
-                self.onScanStateChanged(self.snapshot)
-            }
-        }
+        let scanProgress = scanProgressHandler(root: progressRoot, key: key, generation: progressGeneration)
         scanTask = Task(priority: .utility) { [weak self] in
             do {
-                let result = try await scan(request.root, request.database, request.generation, scanProgress)
+                let result = try await scan(
+                    request.root,
+                    request.database,
+                    request.generation,
+                    scanProgress
+                )
                 self?.scanCompleted(
                     key: key,
                     generation: request.generation,
@@ -350,9 +359,17 @@ final class LibraryScanCoordinator {
                     )
                 )
             } else if !wasCancelled {
+                latestScanFailure = nil
                 onEvent(.clearOperationalErrors(.libraryScan))
                 if let result, let summary = scanSummary(for: result) {
                     onEvent(.presentOperationalMessage(summary, kind: .libraryScan))
+                }
+                if let result {
+                    updateMatchedLyricTrackCount(result)
+                    latestCompletedMatchedLyricsCount = LibraryRootMatchedLyricsCount(
+                        root: latestScanProgress?.root ?? URL(fileURLWithPath: key),
+                        matchedLyricTrackCount: result.matchedLyricTrackCount
+                    )
                 }
                 onLibraryChanged()
                 if startReplayGain { onReplayGainStart() }
@@ -388,5 +405,48 @@ final class LibraryScanCoordinator {
             summary += " (and \(remainingCount) more)"
         }
         return summary
+    }
+}
+
+extension LibraryScanCoordinator {
+    func libraryRoots() -> [LibraryRoot]? {
+        guard let database = databaseProvider() else { return nil }
+        do {
+            let roots = try database.roots()
+            onEvent(.clearOperationalErrors(.database))
+            return roots
+        } catch {
+            onEvent(.error(error, message: "Could not load library folders", kind: .database))
+            return nil
+        }
+    }
+}
+
+private extension LibraryScanCoordinator {
+
+    func scanProgressHandler(root: URL, key: String, generation: UUID) -> LibraryScanProgressHandler {
+        { [weak self] completedCount, totalCount in
+            await MainActor.run {
+                guard let self,
+                      self.activeScanKey == key,
+                      self.scanGenerations[key] == generation else { return }
+                self.latestScanProgress = LibraryRootScanProgress(
+                    root: root,
+                    completedFileCount: completedCount,
+                    totalFileCount: totalCount,
+                    matchedLyricTrackCount: self.latestScanProgress?.matchedLyricTrackCount
+                )
+                self.onScanStateChanged(self.snapshot)
+            }
+        }
+    }
+    func updateMatchedLyricTrackCount(_ result: LibraryScanResult) {
+        guard let progress = latestScanProgress else { return }
+        latestScanProgress = LibraryRootScanProgress(
+            root: progress.root,
+            completedFileCount: progress.completedFileCount,
+            totalFileCount: progress.totalFileCount,
+            matchedLyricTrackCount: result.matchedLyricTrackCount
+        )
     }
 }

@@ -2,7 +2,7 @@
 
 Wavebook is a fully swift and appkit music player for local audio libraries with lots of features for macOS 15 or later. Light/Dark/AMOLED Black theme. Completely offline with optional lyric fetching.
 
-First launch guides new installs through choosing local music folders. Reopen the welcome screen from Help or Settings.
+First launch guides new installs through choosing local music folders. Onboarding shows audio scan progress and a prominent per-folder count of tracks matched to local lyrics. Reopen onboarding with current folders and preferences from Help or Settings.
 
 ## Why
 

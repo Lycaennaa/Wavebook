@@ -21,6 +21,8 @@ public struct LibraryScanResult: Sendable {
     /// Successfully discovered tracks in the root, each carrying its persisted catalog ID.
     /// Tracks preserved because scanning failed are omitted.
     public let tracks: [Track]
+    /// Number of persisted tracks in the root with matched lyrics, when available.
+    public let matchedLyricTrackCount: Int?
     /// Bounded diagnostics for failed candidates.
     public let failures: [LibraryScanDiagnostic]
     /// Total number of failed candidates before diagnostic truncation.
@@ -31,8 +33,14 @@ public struct LibraryScanResult: Sendable {
         max(0, failedCandidateCount - failures.count)
     }
 
-    init(tracks: [Track], failures: [LibraryScanDiagnostic], failedCandidateCount: Int) {
+    init(
+        tracks: [Track],
+        matchedLyricTrackCount: Int?,
+        failures: [LibraryScanDiagnostic],
+        failedCandidateCount: Int
+    ) {
         self.tracks = tracks
+        self.matchedLyricTrackCount = matchedLyricTrackCount
         self.failures = failures
         self.failedCandidateCount = max(failedCandidateCount, failures.count)
     }
@@ -155,6 +163,7 @@ extension LibraryScanner {
             collection.tracks.sort { CatalogFacetOrdering.localizedPathPrecedes($0.path, $1.path) }
             return LibraryScanResult(
                 tracks: collection.tracks,
+                matchedLyricTrackCount: collection.tracks.lazy.filter(\.hasLyrics).count,
                 failures: collection.failures,
                 failedCandidateCount: collection.failedCandidateCount
             )
@@ -178,6 +187,8 @@ extension LibraryScanner {
         )
         return LibraryScanResult(
             tracks: persistedTracks,
+        // A failed display count must not mask completed catalog reconciliation.
+            matchedLyricTrackCount: try? database.matchedLyricTrackCount(rootPath: rootPath),
             failures: collection.failures,
             failedCandidateCount: collection.failedCandidateCount
         )

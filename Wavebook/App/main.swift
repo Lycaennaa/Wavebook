@@ -144,7 +144,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func makeHelpMenu() -> NSMenu {
         let menu = NSMenu(title: "Help")
         let onboardingItem = NSMenuItem(
-            title: "Welcome to Wavebook…",
+            title: "Run Onboarding Flow…",
             action: #selector(showOnboarding(_:)),
             keyEquivalent: ""
         )

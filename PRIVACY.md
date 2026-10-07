@@ -1,6 +1,6 @@
 # Privacy and data flow
 
-This document describes behavior implemented in the current Wavebook source tree. It does not describe LRCLIB's retention, logging, or privacy practices; those are controlled by LRCLIB and may change. This app does not make ANY network requests besides LRCLIB ONLY when you click search.
+This document describes behavior implemented in the current Wavebook source tree. It does not describe LRCLIB's retention, logging, or privacy practices; those are controlled by LRCLIB and may change. This app's only network integration is LRCLIB search, initiated when you click "Search LRCLIB" in the lyrics panel.
 
 ## Data kept on the Mac
 
@@ -11,11 +11,11 @@ This document describes behavior implemented in the current Wavebook source tree
 
 ## Network requests
 
-Lyrics lookup is the documented network integration. Wavebook sends HTTPS requests to `lrclib.net` when a user searches for or downloads lyrics. A user must click "search LRCLIB" to do a network request to LRCLIB.
+The lyrics lookup panel sends HTTPS search requests to `lrclib.net` only after a user clicks "Search LRCLIB".
 
-- A direct track lookup sends the track title, artist, album, and duration as query parameters.
-- A search sends whichever user or track metadata is present, including track name, artist name, album name, and search keywords.
-- A download may perform a direct lookup followed by a search fallback when the direct result does not provide a usable synchronized lyric result.
+- The core downloader's direct-track lookup API sends the track title, artist, album, and duration as query parameters.
+- A search sends only checked, non-empty metadata fields: track name, artist name, album name, and search keywords. Audio files are not uploaded.
+- In the current app, Download Selected saves the chosen search response beside the audio file without making an additional network request.
 - The downloader uses an ephemeral URL session, does not use a local request cache, and rejects redirects outside `https://lrclib.net` and its subdomains.
 - Network requests can fail because of missing metadata, no internet connection, an unavailable service, an invalid response, or no matching lyrics. The app does not treat a failed lyric lookup as a library-scan failure.
 

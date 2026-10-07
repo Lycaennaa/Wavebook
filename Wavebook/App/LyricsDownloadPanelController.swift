@@ -31,6 +31,11 @@ final class LyricsDownloadPanelController: NSWindowController, NSWindowDelegate 
     private let keywordsField = NSTextField(string: "")
     private let resultPicker = NSPopUpButton(frame: .zero, pullsDown: false)
     private let statusLabel = NSTextField(labelWithString: "")
+    private let privacyDisclosureLabel = NSTextField(
+        wrappingLabelWithString:
+            "Only checked, non-empty title, artist, album, and keyword values are sent "
+                + "to lrclib.net when you click Search LRCLIB. No audio files are sent."
+    )
     private let previewTextView = NSTextView()
     private let searchButton = NSButton(title: "Search LRCLIB", target: nil, action: nil)
     private let downloadButton = NSButton(title: "Download Selected", target: nil, action: nil)
@@ -75,7 +80,7 @@ final class LyricsDownloadPanelController: NSWindowController, NSWindowDelegate 
     }
 
     func showDownloadError(_ message: String) {
-        statusLabel.stringValue = message
+        setStatus(message)
         setDownloadInProgress(false)
     }
 
@@ -104,10 +109,14 @@ final class LyricsDownloadPanelController: NSWindowController, NSWindowDelegate 
         titleField.stringValue = track.title
         artistField.stringValue = track.artistDisplay
         albumField.stringValue = track.albumTitle
-        statusLabel.stringValue = "Choose which metadata LRCLIB receives, then select a result."
+        statusLabel.stringValue = "Select metadata to search, then choose a result."
         resultPicker.addItem(withTitle: "Search to load results")
         showPreview(message: "Search results will appear here.")
         updateButtons()
+    }
+    private func setStatus(_ message: String) {
+        statusLabel.stringValue = message
+        NSAccessibility.post(element: statusLabel, notification: .valueChanged)
     }
 
     private func makeContentView() -> NSView {
@@ -146,6 +155,10 @@ final class LyricsDownloadPanelController: NSWindowController, NSWindowDelegate 
             field.placeholderString = "Not sent when unchecked"
         }
         keywordsField.placeholderString = "Optional free-text search"
+        titleField.setAccessibilityLabel("Track title search text")
+        artistField.setAccessibilityLabel("Artist search text")
+        albumField.setAccessibilityLabel("Album search text")
+        keywordsField.setAccessibilityLabel("Search keywords")
     }
 
     private func makeMetadataForm() -> NSStackView {
@@ -167,6 +180,12 @@ final class LyricsDownloadPanelController: NSWindowController, NSWindowDelegate 
         statusLabel.font = .systemFont(ofSize: 12)
         statusLabel.textColor = AppTheme.secondaryText
         statusLabel.lineBreakMode = .byTruncatingTail
+        resultPicker.setAccessibilityLabel("LRCLIB search results")
+        statusLabel.setAccessibilityLabel("Lyrics search status")
+        privacyDisclosureLabel.font = .systemFont(ofSize: 12)
+        privacyDisclosureLabel.textColor = AppTheme.secondaryText
+        privacyDisclosureLabel.maximumNumberOfLines = 0
+        privacyDisclosureLabel.setAccessibilityLabel("Lyrics lookup privacy notice")
     }
 
     private func configurePreviewLabel(_ label: NSTextField) {
@@ -208,9 +227,14 @@ final class LyricsDownloadPanelController: NSWindowController, NSWindowDelegate 
         searchButton.bezelStyle = .rounded
         searchButton.target = self
         searchButton.action = #selector(search)
+        searchButton.setAccessibilityLabel("Search LRCLIB")
+        searchButton.setAccessibilityHelp(
+            "Sends only checked, non-empty metadata values to lrclib.net. No audio files are sent."
+        )
         downloadButton.bezelStyle = .rounded
         downloadButton.target = self
         downloadButton.action = #selector(downloadSelected)
+        downloadButton.setAccessibilityLabel("Download Selected Lyrics")
         let buttons = NSStackView(views: [searchButton, downloadButton])
         buttons.orientation = .horizontal
         buttons.spacing = 10
@@ -226,7 +250,10 @@ final class LyricsDownloadPanelController: NSWindowController, NSWindowDelegate 
         buttons: NSStackView
     ) -> NSStackView {
         let stack = NSStackView(
-            views: [form, resultsLabel, resultPicker, statusLabel, previewLabel, previewScrollView, buttons]
+            views: [
+                form, resultsLabel, resultPicker, statusLabel, previewLabel, previewScrollView,
+                privacyDisclosureLabel, buttons
+            ]
         )
         stack.orientation = .vertical
         stack.spacing = 12
@@ -271,7 +298,7 @@ extension LyricsDownloadPanelController {
         results = []
         resultPicker.removeAllItems()
         resultPicker.addItem(withTitle: "Searching…")
-        statusLabel.stringValue = "Searching LRCLIB…"
+        setStatus("Searching LRCLIB…")
         showPreview(message: "Search results will appear here.")
         isSearching = true
         updateButtons()
@@ -300,14 +327,14 @@ extension LyricsDownloadPanelController {
 
         if results.isEmpty {
             resultPicker.addItem(withTitle: "No results")
-            statusLabel.stringValue = "No LRCLIB results matched the selected metadata."
+            setStatus("No LRCLIB results matched the selected metadata.")
             showPreview(message: "No lyrics available to preview.")
         } else {
             for result in results {
                 resultPicker.addItem(withTitle: resultTitle(result))
             }
             resultPicker.selectItem(at: 0)
-            statusLabel.stringValue = "Found \(results.count) result\(results.count == 1 ? "" : "s")."
+            setStatus("Found \(results.count) result\(results.count == 1 ? "" : "s").")
             updatePreview()
         }
         updateButtons()
@@ -321,7 +348,7 @@ extension LyricsDownloadPanelController {
         results = []
         resultPicker.removeAllItems()
         resultPicker.addItem(withTitle: "Search failed")
-        statusLabel.stringValue = error.localizedDescription
+        setStatus(error.localizedDescription)
         showPreview(message: "Lyrics preview unavailable.")
         updateButtons()
     }

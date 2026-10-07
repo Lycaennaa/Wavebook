@@ -163,6 +163,10 @@ targets:
       - path: Wavebook/App/Library/LibraryScanCoordinator.swift
       - path: Wavebook/App/Onboarding/OnboardingLaunchPolicy.swift
       - path: Wavebook/App/Onboarding/OnboardingCopy.swift
+      - path: Wavebook/App/Onboarding/OnboardingFoldersViewController.swift
+      - path: Wavebook/App/Settings/LibraryFoldersSettingsView.swift
+      - path: Wavebook/App/LyricsDownloadPanelController.swift
+      - path: Wavebook/App/TextEditingShortcut.swift
       - path: OnboardingCopy.json
         buildPhase: resources
       - path: Wavebook/App/SongList/SongListPaginationPolicy.swift

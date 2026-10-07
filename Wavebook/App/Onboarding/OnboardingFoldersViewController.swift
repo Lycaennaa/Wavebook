@@ -49,9 +49,11 @@ final class OnboardingFoldersViewController: NSViewController {
     descriptionLabel.alignment = .center
     descriptionLabel.maximumNumberOfLines = 0
     descriptionLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 600).isActive = true
-    scanStatusLabel.font = .systemFont(ofSize: 12)
-    scanStatusLabel.textColor = AppTheme.secondaryText
+    scanStatusLabel.font = .systemFont(ofSize: 14, weight: .medium)
+    scanStatusLabel.textColor = AppTheme.primaryText
     scanStatusLabel.maximumNumberOfLines = 0
+    scanStatusLabel.setAccessibilityLabel("Library scan status and matched lyric tracks")
+    scanStatusLabel.setAccessibilityHelp("Reports scan status and counts tracks matched to local lyric files.")
     scanIndicator.style = .spinning
     scanIndicator.isIndeterminate = true
     scanIndicator.controlSize = .small
@@ -101,39 +103,34 @@ final class OnboardingFoldersViewController: NSViewController {
     scanSnapshot = snapshot
     if snapshot.isScanning { hasObservedScan = true }
     guard isViewLoaded else { return }
-    if snapshot.isScanning {
-      if let progress = snapshot.progress {
-        scanStatusLabel.stringValue = progressDescription(progress)
-      } else {
-        scanStatusLabel.stringValue = "Scanning selected folders. You can open the library while scanning continues."
-      }
-    } else if let failure = snapshot.failure {
-      let folderName = folderName(for: failure.root)
-      scanStatusLabel.stringValue =
-        "Could not scan \(folderName). Indexed music was kept. "
-          + "Add another folder or open the library."
-    } else if let progress = snapshot.progress {
-      let folderName = folderName(for: progress.root)
-      if progress.totalFileCount == 0 {
-        scanStatusLabel.stringValue =
-          "No supported audio files found in \(folderName). "
-            + "Add another folder with music."
-      } else if progress.completedFileCount == progress.totalFileCount {
-        scanStatusLabel.stringValue =
-          "Scanned \(progress.totalFileCount.formatted()) audio files in \(folderName). "
-            + "Add another folder if the library is still empty."
-      } else {
-        scanStatusLabel.stringValue =
-          "Scan stopped after \(progress.completedFileCount.formatted()) of "
-            + "\(progress.totalFileCount.formatted()) audio files in \(folderName)."
-      }
-    } else if hasObservedScan {
-      scanStatusLabel.stringValue =
-        "No scan is active. Select a folder to scan, or open the library."
-    } else {
-      scanStatusLabel.stringValue = "Add one or more folders to start scanning, or open the library without folders."
-    }
+    let previousStatus = scanStatusLabel.stringValue
+    scanStatusLabel.stringValue =
+      "\(scanStatusDescription(for: snapshot))\n\(matchedLyricsDescription(for: snapshot))"
     updateScanIndicator()
+    if scanStatusLabel.stringValue != previousStatus,
+       !snapshot.isScanning || snapshot.progress == nil {
+      NSAccessibility.post(element: scanStatusLabel, notification: .valueChanged)
+    }
+  }
+
+  private func scanStatusDescription(for snapshot: LibraryScanSnapshot) -> String {
+    if snapshot.isScanning {
+      guard let progress = snapshot.progress else {
+        return "Scanning selected folders. You can open the library while scanning continues."
+      }
+      return progressDescription(progress)
+    }
+    if let failure = snapshot.failure {
+      let folderName = folderName(for: failure.root)
+      return "Could not add or scan \(folderName). Any previously indexed music was kept. "
+        + "Add another folder or open the library."
+    }
+    guard let progress = snapshot.progress else {
+      return hasObservedScan
+        ? "No scan is active. Select a folder to scan, or open the library."
+        : "Add one or more folders to start scanning, or open the library without folders."
+    }
+    return completedScanDescription(progress)
   }
   override func viewDidAppear() {
     super.viewDidAppear()
@@ -157,10 +154,55 @@ final class OnboardingFoldersViewController: NSViewController {
     }
   }
 
+  private func completedScanDescription(_ progress: LibraryRootScanProgress) -> String {
+    let folderName = folderName(for: progress.root)
+    if progress.totalFileCount == 0 {
+      return "No supported audio files found in \(folderName). Add another folder with music."
+    }
+    if progress.completedFileCount == progress.totalFileCount {
+      return "Scanned \(fileCountDescription(progress.totalFileCount, singularFileType: "audio file")) "
+        + "in \(folderName). Add another folder if the library is still empty."
+    }
+    return "Scan stopped after \(progress.completedFileCount.formatted()) of "
+      + "\(fileCountDescription(progress.totalFileCount, singularFileType: "audio file")) in \(folderName)."
+  }
   private func progressDescription(_ progress: LibraryRootScanProgress) -> String {
     let folderName = folderName(for: progress.root)
     return "\(folderName): Scanned \(progress.completedFileCount.formatted()) of "
-      + "\(progress.totalFileCount.formatted()) audio files."
+      + "\(fileCountDescription(progress.totalFileCount, singularFileType: "audio file"))."
+  }
+  private func fileCountDescription(_ count: Int, singularFileType: String) -> String {
+    let fileType = count == 1 ? singularFileType : "\(singularFileType)s"
+    return "\(count.formatted()) \(fileType)"
+  }
+  private func matchedLyricsDescription(for snapshot: LibraryScanSnapshot) -> String {
+    if snapshot.isScanning {
+      if let completed = snapshot.lastCompletedMatchedLyricsCount {
+        return matchedLyricsDescription(for: completed.root, count: completed.matchedLyricTrackCount)
+      }
+      guard let progress = snapshot.progress else { return "Matching lyric tracks after folder discovery…" }
+      let folderName = folderName(for: progress.root)
+      guard let count = progress.matchedLyricTrackCount else { return "Matching lyric tracks in \(folderName)…" }
+      return matchedLyricsDescription(for: progress.root, count: count)
+    }
+    if let failure = snapshot.failure {
+      return "Tracks with matched lyrics in \(folderName(for: failure.root)): unavailable"
+    }
+    if let completed = snapshot.lastCompletedMatchedLyricsCount {
+      return matchedLyricsDescription(for: completed.root, count: completed.matchedLyricTrackCount)
+    }
+    guard let progress = snapshot.progress else {
+      guard let roots = folderActions.roots() else { return "Matched lyric tracks: unavailable" }
+      return roots.isEmpty
+        ? "Matched lyric tracks: 0"
+        : "Matched lyric tracks: scan a folder to count."
+    }
+    return matchedLyricsDescription(for: progress.root, count: progress.matchedLyricTrackCount)
+  }
+
+  private func matchedLyricsDescription(for root: URL, count: Int?) -> String {
+    guard let count else { return "Tracks with matched lyrics in \(folderName(for: root)): unavailable" }
+    return "Tracks with matched lyrics in \(folderName(for: root)): \(count.formatted())"
   }
 
   private func folderName(for root: URL) -> String {

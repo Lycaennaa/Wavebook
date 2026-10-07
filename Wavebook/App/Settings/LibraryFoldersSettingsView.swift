@@ -3,7 +3,7 @@ import WavebookCore
 
 @MainActor
 struct LibraryFolderSettingsActions {
-    let roots: @MainActor () -> [LibraryRoot]
+    let roots: @MainActor () -> [LibraryRoot]?
     let add: @MainActor ([URL]) -> Void
     let remove: @MainActor (LibraryRoot) async -> Void
 }
@@ -35,6 +35,7 @@ final class LibraryFoldersSettingsView: NSView, NSTableViewDataSource, NSTableVi
         column.width = 570
         table.addTableColumn(column)
         table.headerView = nil
+        table.setAccessibilityLabel("Library folders")
         table.allowsMultipleSelection = false
         table.rowHeight = 20
         table.dataSource = self
@@ -56,6 +57,9 @@ final class LibraryFoldersSettingsView: NSView, NSTableViewDataSource, NSTableVi
         removeButton.bezelStyle = .rounded
         removeButton.contentTintColor = AppTheme.accent
         removeButton.setAccessibilityLabel("Remove Selected Library Folder")
+        removeButton.setAccessibilityHelp(
+            "Asks for confirmation. Removing a folder removes its indexed tracks, but never deletes files from disk."
+        )
         removeButton.isEnabled = false
         let buttons = NSStackView(views: [addButton, removeButton])
         buttons.orientation = .horizontal
@@ -87,7 +91,16 @@ final class LibraryFoldersSettingsView: NSView, NSTableViewDataSource, NSTableVi
 
     func configure(_ actions: LibraryFolderSettingsActions) {
         self.actions = actions
-        set(roots: actions.roots())
+        refreshRoots()
+    }
+    private func refreshRoots() {
+        guard let actions else { return }
+        guard let updatedRoots = actions.roots() else {
+            if roots.isEmpty { emptyLabel.stringValue = "Library folders unavailable." }
+            return
+        }
+        emptyLabel.stringValue = "No library folders added."
+        set(roots: updatedRoots)
     }
 
     private func set(roots: [LibraryRoot]) {
@@ -109,7 +122,7 @@ final class LibraryFoldersSettingsView: NSView, NSTableViewDataSource, NSTableVi
         panel.beginSheetModal(for: window) { [weak self] response in
             guard response == .OK, let self, let actions = self.actions else { return }
             actions.add(panel.urls)
-            self.set(roots: actions.roots())
+            self.refreshRoots()
         }
     }
 
@@ -131,7 +144,7 @@ final class LibraryFoldersSettingsView: NSView, NSTableViewDataSource, NSTableVi
                 self.addButton.isEnabled = false
                 self.removeButton.isEnabled = false
                 await actions.remove(root)
-                self.set(roots: actions.roots())
+                self.refreshRoots()
                 self.addButton.isEnabled = true
             }
         }
@@ -148,6 +161,7 @@ final class LibraryFoldersSettingsView: NSView, NSTableViewDataSource, NSTableVi
             ?? NSTextField(labelWithString: "")
         cell.identifier = identifier
         cell.stringValue = roots[row].path
+        cell.setAccessibilityLabel("Library folder: \(roots[row].path)")
         cell.lineBreakMode = .byTruncatingMiddle
         cell.toolTip = roots[row].path
         return cell

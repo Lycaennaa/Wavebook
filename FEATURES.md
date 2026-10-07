@@ -9,8 +9,8 @@ The following describes capabilities visible in the current source tree. Listed 
 ## Library and discovery
 
 - Add one or more local folders and scan files with `mp3`, `flac`, `opus`, `m4a`, `aac`, `wav`, `aif`, `aiff`, `aifc`, and `caf` filename extensions.
-- Fresh installs open a welcome screen, guided folder step, and personalization step; multiple folders can be managed while scans run, and users can enter the library before scans finish. Progress shows checked audio files out of the discovered total for each folder. Personalization applies appearance, ReplayGain, and silence-skipping preferences immediately and links to the 31-band EQ editor. Reopen onboarding from Help or Settings.
-- Manage library folders in Settings; removing a folder removes its indexed tracks from Wavebook without deleting files from disk.
+- Fresh installs open a welcome screen, guided folder step, and personalization step; multiple folders can be managed while scans run, with per-folder scanned/total audio progress and a prominent count of tracks matched to local lyrics for the most recently completed folder scan, plus recovery guidance for empty or failed scans. Help or Settings reopens onboarding with current folders and preferences. Removing a folder requires confirmation, removes its indexed tracks from Wavebook, and never deletes files from disk.
+- Manage library folders in Settings or onboarding; removing a folder removes its indexed tracks from Wavebook without deleting files from disk.
 - Browse and search songs, artists, albums, and genres; navigate between related catalog entries.
 - Read audio metadata and display embedded artwork or supported sidecar images named `cover`, `folder`, or `front`.
 
@@ -33,7 +33,7 @@ The following describes capabilities visible in the current source tree. Listed 
 ## Lyrics, artwork, and file access
 
 - Read `.lrc` lyrics associated with indexed library content. Timestamped lyrics support synchronized line highlighting, click-to-seek, and optional automatic scrolling.
-- Search LRCLIB and download lyrics as `.lrc` sidecars next to the corresponding audio files.
+- Search LRCLIB and download selected results as `.lrc` sidecars next to the corresponding audio files. Search sends only checked, non-empty metadata to `lrclib.net`; no audio files are sent.
 - Open audio and available lyric files in another installed app, or reveal files in Finder.
 
 ## Audio processing
