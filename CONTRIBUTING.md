@@ -26,17 +26,26 @@ Run commands from the repository root.
 Regenerate and verify the committed Xcode project when `project.yml` changes:
 
 ```sh
-xcodegen generate --spec project.yml
+just generate-project
 git diff --exit-code -- Wavebook.xcodeproj
+```
+
+Install local tools with Homebrew when needed:
+
+```sh
+just setup
 ```
 
 Run the repository checks when their tools are installed:
 
 ```sh
-just ci
+just check # generated project, repository tooling, lint, and tests
+just ci    # runner-parity checks plus Release build
 just test
 just lint
 ```
+
+`just run` builds and opens the Debug app. `just lint-fix` applies SwiftLint autofixes, and `just clean` removes `.build`.
 
 `just ci` mirrors the workflow checks and verifies the current runner's Xcode 16.4 / Swift 6.1.2 toolchain. For exact local parity, select Xcode with:
 
@@ -45,6 +54,8 @@ WAVEBOOK_DEVELOPER_DIR="/Applications/Xcode16.4.app/Contents/Developer" just ci
 ```
 
 Xcode 16.4 can be downloaded at https://developer.apple.com/download/all.
+
+The justfile anchors `.build` paths to its worktree, keeping DerivedData, SwiftPM checkouts, and test-result bundles isolated across worktrees.
 
 The local `just build`, `just build-release`, and `just test` recipes reuse `.build/derived-data`, including its SwiftPM checkout and module caches, avoiding duplicate package clones. Local packaging reuses those Release products and stages its signed/stripped app copy outside the cache. `just test` removes its result bundle after a successful run and retains `.build/test-results.xcresult` on failure for crash diagnostics. Remove `.build/derived-data` when no build is running to reclaim space; delete the failure result after exporting needed attachments. The release workflow shares DerivedData between tests and packaging. Update the pinned local versions when CI's toolchain changes. `project.yml`'s `xcodeVersion` is XcodeGen metadata, not a toolchain selector.
 
