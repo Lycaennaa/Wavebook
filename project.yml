@@ -154,6 +154,7 @@ targets:
       - path: Wavebook/App/Catalog/CatalogShuffleCoordinator.swift
       - path: Wavebook/App/Navigation/PlaylistPlaybackSelection.swift
       - path: Wavebook/App/Playback/PlaybackQueueCoordinator.swift
+      - path: Wavebook/App/Playback/PlaybackAudioOutputController.swift
       - path: Wavebook/App/Playback/PlaybackPresentationState.swift
       - path: Wavebook/App/Playback/PlaybackReplayGainController.swift
       - path: Wavebook/App/Onboarding/OnboardingPersonalizationViewController.swift
@@ -170,6 +171,8 @@ targets:
       - path: Wavebook/App/AppAppearance.swift
       - path: Wavebook/App/ThemeAwareViews.swift
       - path: Wavebook/App/Window/RootSplitView.swift
+      - path: Wavebook/App/Playback/BluetoothDisconnectResumeTracker.swift
+      - path: Wavebook/App/Settings/OutputDeviceSettings.swift
       - path: Wavebook/App/SongList/SongListViewController.swift
       - path: Wavebook/App/SongList/SongListActions.swift
       - path: Wavebook/App/SongList/SongItem.swift

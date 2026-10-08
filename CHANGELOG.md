@@ -3,6 +3,8 @@
 This file records user-visible changes when they are prepared for publication. The release workflow also generates GitHub release notes from version tags.
 
 ## Unreleased
+- Saved playback volume separately for each output device.
+- Added an auto-resume setting for output changes, including macOS media pauses on Bluetooth disconnect.
 - Added a fresh-install welcome screen with multi-folder setup, background scanning, and Help/Settings actions to reopen it.
 - Refined welcome copy and added Debug-only JSON reload for copy iteration.
 - Added a guided folder step with multi-folder management, per-folder audio progress, visible matched-lyric track counts, and early library access.

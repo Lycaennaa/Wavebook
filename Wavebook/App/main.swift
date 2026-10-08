@@ -50,8 +50,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return .terminateLater
     }
 
-    func handleMediaKey(_ command: MediaKeyCommand) -> Bool {
-        windowController?.handleMediaKey(command) ?? false
+    func handleMediaKey(
+        _ command: MediaKeyCommand,
+        at timestamp: TimeInterval? = ProcessInfo.processInfo.systemUptime
+    ) -> Bool {
+        windowController?.handleMediaKey(command, at: timestamp) ?? false
     }
 
     @objc private func addLibraryFolder(_ sender: Any?) {
@@ -231,11 +234,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             center.playCommand.addTarget { [weak self] _ in
                 self?.handleRemoteCommand(.play) ?? .noSuchContent
             },
-            center.pauseCommand.addTarget { [weak self] _ in
-                self?.handleRemoteCommand(.pause) ?? .noSuchContent
+            center.pauseCommand.addTarget { [weak self] event in
+                self?.handleRemoteCommand(.pause, event: event) ?? .noSuchContent
             },
-            center.togglePlayPauseCommand.addTarget { [weak self] _ in
-                self?.handleRemoteCommand(.togglePlayPause) ?? .noSuchContent
+            center.togglePlayPauseCommand.addTarget { [weak self] event in
+                self?.handleRemoteCommand(.togglePlayPause, event: event) ?? .noSuchContent
             },
             center.nextTrackCommand.addTarget { [weak self] _ in
                 self?.handleRemoteCommand(.nextTrack) ?? .noSuchContent
@@ -246,8 +249,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ]
     }
 
-    private func handleRemoteCommand(_ command: MediaKeyCommand) -> MPRemoteCommandHandlerStatus {
-        handleMediaKey(command) ? .success : .noSuchContent
+    private func handleRemoteCommand(
+        _ command: MediaKeyCommand,
+        at timestamp: TimeInterval? = ProcessInfo.processInfo.systemUptime
+    ) -> MPRemoteCommandHandlerStatus {
+        handleMediaKey(command, at: timestamp) ? .success : .noSuchContent
+    }
+
+    private func handleRemoteCommand(
+        _ command: MediaKeyCommand,
+        event: MPRemoteCommandEvent
+    ) -> MPRemoteCommandHandlerStatus {
+        let receivedAtUptime = ProcessInfo.processInfo.systemUptime
+        let timestamp = MediaPlayerCommandTimestamp.systemUptime(
+            from: event.timestamp,
+            receivedAtUptime: receivedAtUptime,
+            receivedAt: Date()
+        )
+        return handleRemoteCommand(command, at: timestamp)
     }
 }
 

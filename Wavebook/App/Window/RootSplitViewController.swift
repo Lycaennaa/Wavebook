@@ -76,8 +76,11 @@ final class RootSplitViewController: NSViewController {
         view = RootSplitView(sidebar: sidebarController.view, main: mainController.view)
     }
 
-    func handleMediaKey(_ command: MediaKeyCommand) -> Bool {
-        mainController.handleMediaKey(command)
+    func handleMediaKey(
+        _ command: MediaKeyCommand,
+        at timestamp: TimeInterval? = ProcessInfo.processInfo.systemUptime
+    ) -> Bool {
+        mainController.handleMediaKey(command, at: timestamp)
     }
 
     func addRoot() {
@@ -119,6 +122,8 @@ final class RootSplitViewController: NSViewController {
             appearance: AppTheme.appearance,
             replayGainMode: mainController.playbackSession.replayGain.mode,
             skipSilentSegments: mainController.playbackSession.transport.skipSilentSegments,
+            autoContinuePlaybackAfterOutputChange:
+                mainController.playbackSession.transport.autoContinuePlaybackAfterOutputChange,
             onAppearanceChanged: { AppTheme.apply($0) },
             onReplayGainModeChanged: { [weak self] mode in
                 guard let self else { return false }
@@ -127,6 +132,10 @@ final class RootSplitViewController: NSViewController {
             onSkipSilentSegmentsChanged: { [weak self] enabled in
                 guard let self else { return false }
                 return self.mainController.playbackSession.transport.setSkipSilentSegments(enabled)
+            },
+            onAutoContinuePlaybackAfterOutputChange: { [weak self] enabled in
+                guard let self else { return false }
+                return self.mainController.playbackSession.transport.setAutoContinuePlaybackAfterOutputChange(enabled)
             },
             onOpenEqualizer: { [weak self] in self?.mainController.showEqualizer() },
             onBack: { [weak self] in self?.showOnboardingFolders() },

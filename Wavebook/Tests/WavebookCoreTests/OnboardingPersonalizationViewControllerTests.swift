@@ -29,7 +29,8 @@ final class OnboardingPersonalizationViewControllerTests: XCTestCase {
         let popups = appKitDescendants(of: NSPopUpButton.self, in: root)
         let appearancePopup = try XCTUnwrap(popups.first)
         let replayGainPopup = try XCTUnwrap(popups.dropFirst().first)
-        let skipButton = try XCTUnwrap(appKitDescendants(of: NSButton.self, in: root).first {
+        let buttons = appKitDescendants(of: NSButton.self, in: root)
+        let skipButton = try XCTUnwrap(buttons.first {
             $0.title == "Skip silence at the start and end of songs"
         })
 
@@ -60,6 +61,37 @@ final class OnboardingPersonalizationViewControllerTests: XCTestCase {
         skipButton.state = .off
         sendAppKitAction(skipButton)
         XCTAssertEqual(skipButton.state, .off)
+    }
+
+    func testAutoContinueSettingRevertsFailedWritesAndKeepsSuccessfulValue() throws {
+        _ = NSApplication.shared
+        var values: [Bool] = []
+        var writeSucceeds = false
+        let controller = makeController(
+            appearance: .system,
+            replayGainMode: .off,
+            skipSilentSegments: false,
+            autoContinuePlaybackAfterOutputChange: true,
+            onAutoContinuePlaybackAfterOutputChange: {
+                values.append($0)
+                return writeSucceeds
+            }
+        )
+        let button = try XCTUnwrap(appKitDescendants(of: NSButton.self, in: controller.view).first {
+            $0.title == "Continue playback after output changes"
+        })
+        XCTAssertEqual(button.state, .on)
+
+        button.state = .off
+        sendAppKitAction(button)
+        XCTAssertEqual(values, [false])
+        XCTAssertEqual(button.state, .on)
+
+        writeSucceeds = true
+        button.state = .off
+        sendAppKitAction(button)
+        XCTAssertEqual(values, [false, false])
+        XCTAssertEqual(button.state, .off)
     }
 
     func testGuidanceExplainsSystemDefaultBlackThemeReplayGainAndPersonalEQ() throws {
@@ -106,9 +138,11 @@ final class OnboardingPersonalizationViewControllerTests: XCTestCase {
         appearance: AppAppearance,
         replayGainMode: ReplayGainMode,
         skipSilentSegments: Bool,
+        autoContinuePlaybackAfterOutputChange: Bool = true,
         onAppearanceChanged: @escaping (AppAppearance) -> Void = { _ in },
         onReplayGainModeChanged: @escaping (ReplayGainMode) -> Bool = { _ in true },
         onSkipSilentSegmentsChanged: @escaping (Bool) -> Bool = { _ in true },
+        onAutoContinuePlaybackAfterOutputChange: @escaping (Bool) -> Bool = { _ in true },
         onOpenEqualizer: @escaping () -> Void = {},
         onBack: @escaping () -> Void = {},
         onReturnToLibrary: @escaping () -> Void = {}
@@ -117,9 +151,11 @@ final class OnboardingPersonalizationViewControllerTests: XCTestCase {
             appearance: appearance,
             replayGainMode: replayGainMode,
             skipSilentSegments: skipSilentSegments,
+            autoContinuePlaybackAfterOutputChange: autoContinuePlaybackAfterOutputChange,
             onAppearanceChanged: onAppearanceChanged,
             onReplayGainModeChanged: onReplayGainModeChanged,
             onSkipSilentSegmentsChanged: onSkipSilentSegmentsChanged,
+            onAutoContinuePlaybackAfterOutputChange: onAutoContinuePlaybackAfterOutputChange,
             onOpenEqualizer: onOpenEqualizer,
             onBack: onBack,
             onReturnToLibrary: onReturnToLibrary

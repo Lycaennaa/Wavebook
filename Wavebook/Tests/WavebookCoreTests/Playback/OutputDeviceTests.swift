@@ -15,4 +15,14 @@ final class OutputDeviceTests: XCTestCase {
 
         XCTAssertEqual(sorted.map(\.id), [4, 5, 3, 1, 2])
     }
+
+    func testBluetoothTransportFlagIsPreserved() {
+        let bluetooth = OutputDevice(id: 1, uid: "bluetooth", name: "Headphones", isDefault: false, isBluetooth: true)
+        let wired = OutputDevice(id: 2, uid: "wired", name: "Headphones", isDefault: false, isBluetooth: false)
+        let unknown = OutputDevice(id: 3, uid: "unknown", name: "Unknown", isDefault: false, isBluetooth: nil)
+
+        XCTAssertEqual(bluetooth.isBluetooth, true)
+        XCTAssertEqual(wired.isBluetooth, false)
+        XCTAssertNil(unknown.isBluetooth)
+    }
 }

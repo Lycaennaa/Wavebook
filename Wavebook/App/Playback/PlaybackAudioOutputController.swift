@@ -4,6 +4,8 @@ import WavebookCore
 @MainActor
 final class PlaybackAudioOutputController {
     private let audioPlayer: AudioFilePlayer
+    private(set) var activeOutputDeviceID: AudioDeviceID?
+    private(set) var isBluetoothOutput: Bool?
 
     var onDefaultOutputDeviceChanged: (() -> Void)?
 
@@ -27,8 +29,24 @@ final class PlaybackAudioOutputController {
         try audioPlayer.outputDeviceID()
     }
 
-    func setOutputDevice(id: AudioDeviceID) throws {
-        try audioPlayer.setOutputDevice(id: id)
+    func setOutputDevice(id: AudioDeviceID, isBluetooth: Bool?) throws {
+        do {
+            try audioPlayer.setOutputDevice(id: id)
+            activeOutputDeviceID = id
+            isBluetoothOutput = isBluetooth
+        } catch {
+            if let outputError = error as? OutputDeviceError,
+               case .routeRollbackFailed = outputError {
+                activeOutputDeviceID = nil
+                isBluetoothOutput = nil
+            }
+            throw error
+        }
+    }
+
+    func reconcileOutputDevice(id: AudioDeviceID?, isBluetooth: Bool?) {
+        activeOutputDeviceID = id
+        isBluetoothOutput = isBluetooth
     }
 
     func apply(equalizerProfile: EqualizerProfile) {

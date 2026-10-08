@@ -99,7 +99,8 @@ final class PlayerBarView: ThemeBackgroundView {
         controlsView.onSkipSegmentsRequested = { [weak self] in self?.onSkipSegmentsRequested?() }
         controlsView.translatesAutoresizingMaskIntoConstraints = false
         progressSlider.setAccessibilityLabel("Playback Position")
-        volumeSlider.setAccessibilityLabel("Volume")
+        volumeSlider.setAccessibilityLabel("Output Device Volume")
+        volumeSlider.toolTip = "Adjust volume for the current output device"
     }
 
     private func configureLyricsButton() {

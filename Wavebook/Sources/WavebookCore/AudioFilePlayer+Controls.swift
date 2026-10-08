@@ -258,6 +258,8 @@ extension AudioFilePlayer {
             restoreEqualizerProfileAfterEngineConfiguration()
             return
         }
+        let wasPlaying = shouldBePlaying
+        let shouldContinuePlayback = wasPlaying && autoContinuePlaybackAfterOutputChange
         let wasAnalyzingSilence = silenceAnalysisTask != nil
         let restartTime = elapsedTime
         playbackID += 1
@@ -267,20 +269,29 @@ extension AudioFilePlayer {
         engine.stop()
         restoreEqualizerProfileAfterEngineConfiguration()
         setNormalizationGainDB(currentNormalizationGainDB)
+        if !shouldContinuePlayback {
+            shouldBePlaying = false
+        }
         do {
             let file = try AVAudioFile(forReading: url)
             let boundedRestartTime = min(max(restartTime, 0), Double(file.length) / file.processingFormat.sampleRate)
             if wasAnalyzingSilence, skipSilentSegments, !automaticSkipsDisabledForPlayback {
                 currentPlaybackRange = nil
+                currentPlaybackSchedule = .empty
+                automaticSkipBoundaryIndex = 0
                 currentTrailingSilenceDuration = 0
                 accumulatedElapsed = boundedRestartTime
                 renderBaselineSampleTime = nil
                 playbackStartedAt = nil
-                startSilenceAnalysis(
-                    for: url,
-                    requestedStartTime: accumulatedElapsed,
-                    playbackID: playbackID
-                )
+                if shouldContinuePlayback {
+                    startSilenceAnalysis(
+                        for: url,
+                        requestedStartTime: accumulatedElapsed,
+                        playbackID: playbackID
+                    )
+                } else if wasPlaying {
+                    onPlaybackPausedAfterOutputChange?()
+                }
                 return
             }
 
@@ -296,6 +307,9 @@ extension AudioFilePlayer {
                 guard isCurrent(callbackState) else { return }
             }
             try schedulePlaybackPlan(plan, for: file, url: url)
+            if wasPlaying, !shouldContinuePlayback {
+                onPlaybackPausedAfterOutputChange?()
+            }
         } catch {
             let failedTrackElapsed = min(max(restartTime, 0), currentDuration)
             clearPlaybackState()

@@ -8,13 +8,13 @@ final class AudioSettingsCoordinator {
     private static let logger = Logger(subsystem: "Wavebook", category: "application")
 
     private let databaseProvider: () -> LibraryDatabase?
-    private let audioOutput: PlaybackAudioOutputController
-    private let playbackTransport: PlaybackTransportController
+    let audioOutput: PlaybackAudioOutputController
+    let playbackTransport: PlaybackTransportController
     private weak var playerBar: PlayerBarView?
     var onVolumeChanged: ((Float) -> Void)?
     private let onEvent: (PlaybackSessionEvent) -> Void
 
-    private let outputDevices = OutputDeviceProvider()
+    let outputDevices = OutputDeviceProvider()
 
     private(set) var selectedOutputDeviceUID: String?
     private(set) var hiddenOutputDeviceUIDs: Set<String> = []
@@ -42,22 +42,44 @@ final class AudioSettingsCoordinator {
     }
 
     func applySavedVolume() {
+        do {
+            let uid = try volumeOutputDeviceUID()
+            applySavedVolume(forOutputDeviceUID: uid)
+        } catch {
+            report(error, message: "Could not determine output device for saved volume", kind: .audioOutput)
+        }
+    }
+
+    private func applySavedVolume(forOutputDeviceUID uid: String) {
         let volume: Float
         do {
-            volume = try databaseProvider()?.volume() ?? 1
+            volume = try databaseProvider()?.volume(forOutputDeviceUID: uid) ?? 1
             clear(.database)
         } catch {
-            volume = 1
             report(error, message: "Could not load saved volume", kind: .database)
+            return
         }
-        audioOutput.volume = volume
-        playerBar?.setVolume(volume)
-        onVolumeChanged?(volume)
+        applySavedVolume(volume)
     }
+
     func applySavedVolume(_ volume: Float) {
         audioOutput.volume = volume
         playerBar?.setVolume(volume)
         onVolumeChanged?(volume)
+    }
+
+    private func volumeOutputDeviceUID() throws -> String {
+        let defaultOutputUID: String?
+        if selectedOutputDeviceUID == nil {
+            defaultOutputUID = try outputDevices.defaultOutputDevice()?.uid
+        } else {
+            defaultOutputUID = nil
+        }
+        guard let uid = OutputDeviceVolumeRouting.outputDeviceUID(
+            selectedOutputUID: selectedOutputDeviceUID,
+            defaultOutputUID: defaultOutputUID
+        ) else { throw OutputDeviceError.unavailable }
+        return uid
     }
 
     func setVolume(_ volume: Float) {
@@ -65,7 +87,10 @@ final class AudioSettingsCoordinator {
         playerBar?.setVolume(volume)
         onVolumeChanged?(volume)
         do {
-            try databaseProvider()?.saveVolume(volume)
+            if let database = databaseProvider() {
+                let uid = try volumeOutputDeviceUID()
+                try database.saveVolume(volume, forOutputDeviceUID: uid)
+            }
             clear(.database)
         } catch {
             report(error, message: "Could not save volume", kind: .database)
@@ -76,30 +101,33 @@ final class AudioSettingsCoordinator {
         do {
             selectedOutputDeviceUID = try databaseProvider()?.selectedOutputDeviceUID()
             hiddenOutputDeviceUIDs = try databaseProvider()?.hiddenOutputDeviceUIDs() ?? []
-            try applyOutputDevice(uid: selectedOutputDeviceUID)
-            clear(.database)
+            let device = try applyOutputDevice(uid: selectedOutputDeviceUID)
+            applySavedVolume(forOutputDeviceUID: device.uid)
             clear(.audioOutput)
         } catch {
             selectedOutputDeviceUID = nil
             do {
-                try applyOutputDevice(uid: nil)
+                let device = try applyOutputDevice(uid: nil)
+                applySavedVolume(forOutputDeviceUID: device.uid)
             } catch {
                 report(error, message: "Could not restore system audio output", kind: .audioOutput)
             }
             report(error, message: "Saved audio output is unavailable; using system default", kind: .audioOutput)
         }
     }
+
     func applySavedOutputDevice(selectedUID: String?, hiddenUIDs: Set<String>) {
         selectedOutputDeviceUID = selectedUID
         hiddenOutputDeviceUIDs = hiddenUIDs
         do {
-            try applyOutputDevice(uid: selectedUID)
-            clear(.database)
+            let device = try applyOutputDevice(uid: selectedUID)
+            applySavedVolume(forOutputDeviceUID: device.uid)
             clear(.audioOutput)
         } catch {
             selectedOutputDeviceUID = nil
             do {
-                try applyOutputDevice(uid: nil)
+                let device = try applyOutputDevice(uid: nil)
+                applySavedVolume(forOutputDeviceUID: device.uid)
             } catch {
                 report(error, message: "Could not restore system audio output", kind: .audioOutput)
             }
@@ -111,8 +139,10 @@ final class AudioSettingsCoordinator {
         try audioOutput.startMonitoringDefaultOutputDevice()
     }
 
-    private func applyOutputDevice(uid: String?) throws {
-        try audioOutput.setOutputDevice(id: resolvedOutputDevice(uid: uid).id)
+    private func applyOutputDevice(uid: String?) throws -> OutputDevice {
+        let device = try resolvedOutputDevice(uid: uid)
+        try audioOutput.setOutputDevice(id: device.id, isBluetooth: device.isBluetooth)
+        return device
     }
     private func resolvedOutputDevice(uid: String?) throws -> OutputDevice {
         if let uid {
@@ -121,6 +151,15 @@ final class AudioSettingsCoordinator {
         }
         guard let device = try outputDevices.defaultOutputDevice() else { throw OutputDeviceError.unavailable }
         return device
+    }
+    private func loadOutputSettings(uid: String?) throws -> OutputDeviceSettings {
+        guard let database = databaseProvider() else { throw OutputDeviceError.unavailable }
+        let device = try resolvedOutputDevice(uid: uid)
+        return OutputDeviceSettings(
+            device: device,
+            equalizerProfile: try database.equalizerProfile(deviceUID: device.uid),
+            volume: try database.volume(forOutputDeviceUID: device.uid)
+        )
     }
 
     private func activeEqualizerDevice() throws -> OutputDevice {
@@ -203,6 +242,9 @@ final class AudioSettingsCoordinator {
             onSkipSilentSegmentsChanged: { [weak self] enabled in
                 self?.playbackTransport.setSkipSilentSegments(enabled) ?? false
             },
+            onAutoContinuePlaybackAfterOutputChange: { [weak self] enabled in
+                self?.playbackTransport.setAutoContinuePlaybackAfterOutputChange(enabled) ?? false
+            },
             libraryFolders: libraryFolders,
             onStartOnboarding: onStartOnboarding,
             reactivate: reactivate
@@ -223,12 +265,7 @@ final class AudioSettingsCoordinator {
 }
 extension AudioSettingsCoordinator {
 
-    func defaultOutputDeviceChanged() {
-        defer { refreshSettingsOutputDevices() }
-        _ = selectOutputDevice(uid: nil)
-    }
-
-    private func refreshSettingsOutputDevices() {
+    func refreshSettingsOutputDevices() {
         guard settingsPanelBinder.isVisible else { return }
         do {
             let devices = try outputDevices.devices().filter { !hiddenOutputDeviceUIDs.contains($0.uid) }
@@ -259,20 +296,18 @@ extension AudioSettingsCoordinator {
     func selectOutputDevice(uid: String?) -> Bool {
         let previousUID = selectedOutputDeviceUID
         let previousDeviceID: AudioDeviceID
-        let targetDevice: OutputDevice
-        let targetProfile: EqualizerProfile
+        let previousIsBluetoothOutput = audioOutput.isBluetoothOutput
+        let targetSettings: OutputDeviceSettings
         do {
-            guard let database = databaseProvider() else { throw OutputDeviceError.unavailable }
             previousDeviceID = try audioOutput.outputDeviceID()
-            targetDevice = try resolvedOutputDevice(uid: uid)
-            targetProfile = try database.equalizerProfile(deviceUID: targetDevice.uid)
+            targetSettings = try loadOutputSettings(uid: uid)
         } catch {
-            report(error, message: "Could not load equalizer settings for the audio output", kind: .database)
+            report(error, message: "Could not load settings for the audio output", kind: .database)
             return false
         }
 
         do {
-            try audioOutput.setOutputDevice(id: targetDevice.id)
+            try audioOutput.setOutputDevice(id: targetSettings.device.id, isBluetooth: targetSettings.device.isBluetooth)
         } catch {
             if let outputError = error as? OutputDeviceError,
                case .routeRollbackFailed = outputError {
@@ -291,7 +326,7 @@ extension AudioSettingsCoordinator {
             clear(.database)
         } catch let saveError {
             do {
-                try audioOutput.setOutputDevice(id: previousDeviceID)
+                try audioOutput.setOutputDevice(id: previousDeviceID, isBluetooth: previousIsBluetoothOutput)
                 selectedOutputDeviceUID = previousUID
                 refreshSettingsOutputDevices()
             } catch {
@@ -307,27 +342,25 @@ extension AudioSettingsCoordinator {
         }
 
         selectedOutputDeviceUID = uid
+        applySavedVolume(targetSettings.volume)
         equalizerProfileCanBeSaved = true
-        setEqualizerProfile(targetProfile, outputDeviceName: targetDevice.name)
+        setEqualizerProfile(targetSettings.equalizerProfile, outputDeviceName: targetSettings.device.name)
         refreshSettingsOutputDevices()
         clear(.audioOutput)
         return true
     }
 
-    private func reconcileOutputDeviceSelection() -> Bool {
+    func reconcileOutputDeviceSelection() -> Bool {
         do {
             let outputDeviceID = try audioOutput.outputDeviceID()
             let defaultDeviceID = try OutputDeviceProvider.defaultOutputDeviceID()
-            let uid: String?
-            if outputDeviceID == defaultDeviceID {
-                uid = nil
-            } else {
-                guard let device = try outputDevices.devices().first(where: { $0.id == outputDeviceID }) else {
-                    throw OutputDeviceError.unavailable
-                }
-                uid = device.uid
+            guard let device = try outputDevices.devices().first(where: { $0.id == outputDeviceID }) else {
+                throw OutputDeviceError.unavailable
             }
+            let uid = outputDeviceID == defaultDeviceID ? nil : device.uid
             selectedOutputDeviceUID = uid
+            audioOutput.reconcileOutputDevice(id: outputDeviceID, isBluetooth: device.isBluetooth)
+            applySavedVolume(forOutputDeviceUID: device.uid)
             settingsPanelBinder.set(
                 devices: visibleOutputDevices(),
                 selectedUID: uid,
@@ -337,6 +370,7 @@ extension AudioSettingsCoordinator {
             return true
         } catch {
             report(error, message: "Could not determine the active audio output", kind: .audioOutput)
+            audioOutput.reconcileOutputDevice(id: nil, isBluetooth: nil)
             return false
         }
     }
@@ -414,13 +448,11 @@ extension AudioSettingsCoordinator {
     func hideOutputDevices(uids: Set<String>) {
         let previousSelectedUID = selectedOutputDeviceUID
         let switchesToDefault = previousSelectedUID.map(uids.contains) == true
-        var defaultProfile: EqualizerProfile?
-        var defaultDeviceName: String?
+        var defaultOutput: OutputDeviceSettings?
         if switchesToDefault {
-            guard let defaultOutput = loadDefaultOutputForHide() else { return }
-            defaultProfile = defaultOutput.profile
-            defaultDeviceName = defaultOutput.device.name
-            guard switchToDefaultOutput(defaultOutput.device) else { return }
+            guard let output = loadDefaultOutputForHide() else { return }
+            defaultOutput = output
+            guard switchToDefaultOutput(output.device) else { return }
         }
 
         do {
@@ -428,9 +460,10 @@ extension AudioSettingsCoordinator {
             if switchesToDefault {
                 try database.saveOutputConfiguration(selectedUID: nil, hiddenUIDs: uids)
                 selectedOutputDeviceUID = nil
-                if let defaultProfile {
+                if let defaultOutput {
                     equalizerProfileCanBeSaved = true
-                    setEqualizerProfile(defaultProfile, outputDeviceName: defaultDeviceName)
+                    setEqualizerProfile(defaultOutput.equalizerProfile, outputDeviceName: defaultOutput.device.name)
+                    applySavedVolume(defaultOutput.volume)
                 }
             } else {
                 try database.saveHiddenOutputDeviceUIDs(uids)
@@ -439,7 +472,7 @@ extension AudioSettingsCoordinator {
         } catch {
             if switchesToDefault {
                 do {
-                    try applyOutputDevice(uid: previousSelectedUID)
+                    _ = try applyOutputDevice(uid: previousSelectedUID)
                 } catch {
                     reconcileOutputAfterFailedRollback()
                     report(error, message: "Could not restore audio output after hiding failed", kind: .audioOutput)
@@ -456,21 +489,17 @@ extension AudioSettingsCoordinator {
         clear(.database)
         clear(.audioOutput)
     }
-    private func loadDefaultOutputForHide() -> (device: OutputDevice, profile: EqualizerProfile?)? {
+    private func loadDefaultOutputForHide() -> OutputDeviceSettings? {
         do {
-            guard databaseProvider() != nil else { throw OutputDeviceError.unavailable }
-            let device = try resolvedOutputDevice(uid: nil)
-            let profile = try databaseProvider()?.equalizerProfile(deviceUID: device.uid)
-            return (device, profile)
+            return try loadOutputSettings(uid: nil)
         } catch {
-            report(error, message: "Could not load equalizer settings for the default audio output", kind: .database)
+            report(error, message: "Could not load settings for the default audio output", kind: .database)
             return nil
         }
-
     }
     private func switchToDefaultOutput(_ device: OutputDevice) -> Bool {
         do {
-            try audioOutput.setOutputDevice(id: device.id)
+            try audioOutput.setOutputDevice(id: device.id, isBluetooth: device.isBluetooth)
             return true
         } catch {
             if let outputError = error as? OutputDeviceError,

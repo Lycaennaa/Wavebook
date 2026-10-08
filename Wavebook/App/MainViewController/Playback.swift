@@ -42,14 +42,24 @@ extension MainViewController {
     }
 
     @discardableResult
-    func handleMediaKey(_ command: MediaKeyCommand) -> Bool {
+    func handleMediaKey(
+        _ command: MediaKeyCommand,
+        at timestamp: TimeInterval? = ProcessInfo.processInfo.systemUptime
+    ) -> Bool {
         initialLibraryScanShuffleRequest.cancel()
         navigation.cancelShuffle()
-        return playbackSession.queue.handleMediaKey(
+        let wasPlaying = playbackSession.transport.isPlaying
+        let handled = playbackSession.queue.handleMediaKey(
             command,
             selectedTrack: navigation.selectedTrack,
             hasVisibleLibraryTracks: !navigation.visibleTracks.isEmpty,
             shuffle: { [weak self] in self?.startShufflePlay() ?? false }
         )
+        if wasPlaying,
+           !playbackSession.transport.isPlaying,
+           command == .pause || command == .togglePlayPause {
+            audioSettings.noteMediaKeyPause(at: timestamp)
+        }
+        return handled
     }
 }

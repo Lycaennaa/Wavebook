@@ -7,11 +7,17 @@ final class SettingsPanelController: NSWindowController, NSWindowDelegate {
     var onReplayGainAnalysisFileConcurrencyChanged: ((Int) -> Void)?
     var onSkipSilentSegmentsChanged: ((Bool) -> Void)?
     var onStartOnboarding: (() -> Void)?
+    var onAutoContinuePlaybackAfterOutputChange: ((Bool) -> Bool)?
 
     private let popup = NSPopUpButton()
     private let appearancePopup = NSPopUpButton()
     private let skipSilentSegmentsButton = NSButton(
         checkboxWithTitle: "Skip silent segments at the start and end of songs",
+        target: nil,
+        action: nil
+    )
+    private let autoContinuePlaybackAfterOutputChangeButton = NSButton(
+        checkboxWithTitle: "Continue playback after output changes",
         target: nil,
         action: nil
     )
@@ -33,6 +39,7 @@ final class SettingsPanelController: NSWindowController, NSWindowDelegate {
     private var actionTask: Task<Void, Never>?
     private var actionErrorReason: String?
     private var actionInProgress = false
+    private var autoContinuePlaybackAfterOutputChange = true
 
     init() {
         let panel = NSPanel(
@@ -110,6 +117,11 @@ final class SettingsPanelController: NSWindowController, NSWindowDelegate {
         skipSilentSegmentsButton.state = enabled ? .on : .off
     }
 
+    func setAutoContinuePlaybackAfterOutputChange(_ enabled: Bool) {
+        autoContinuePlaybackAfterOutputChange = enabled
+        autoContinuePlaybackAfterOutputChangeButton.state = enabled ? .on : .off
+    }
+
     func setReplayGainService(_ service: ReplayGainAnalysisService?) {
         replayGainService = service
         actionErrorReason = nil
@@ -152,6 +164,7 @@ extension SettingsPanelController {
             popup.widthAnchor.constraint(equalTo: stack.widthAnchor),
             hiddenUIDField.widthAnchor.constraint(equalTo: stack.widthAnchor),
             skipSilentSegmentsButton.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            autoContinuePlaybackAfterOutputChangeButton.widthAnchor.constraint(equalTo: stack.widthAnchor),
             libraryFoldersView.widthAnchor.constraint(equalTo: stack.widthAnchor),
             libraryFoldersView.heightAnchor.constraint(equalToConstant: 212),
             separator.widthAnchor.constraint(equalTo: stack.widthAnchor),
@@ -221,6 +234,12 @@ extension SettingsPanelController {
         skipSilentSegmentsButton.target = self
         skipSilentSegmentsButton.action = #selector(skipSilentSegmentsChanged)
         skipSilentSegmentsButton.contentTintColor = AppTheme.accent
+        autoContinuePlaybackAfterOutputChangeButton.target = self
+        autoContinuePlaybackAfterOutputChangeButton.action = #selector(autoContinuePlaybackAfterOutputChangeChanged)
+        autoContinuePlaybackAfterOutputChangeButton.contentTintColor = AppTheme.accent
+        autoContinuePlaybackAfterOutputChangeButton.setAccessibilityHelp(
+            "Resume the current song after the audio output device changes."
+        )
         separator.boxType = .separator
         return [
             outputTitle,
@@ -231,6 +250,7 @@ extension SettingsPanelController {
             outputStatusLabel,
             playbackTitle,
             skipSilentSegmentsButton,
+            autoContinuePlaybackAfterOutputChangeButton,
             separator
         ]
     }
@@ -443,6 +463,14 @@ extension SettingsPanelController {
     }
     @objc private func skipSilentSegmentsChanged() {
         onSkipSilentSegmentsChanged?(skipSilentSegmentsButton.state == .on)
+    }
+    @objc private func autoContinuePlaybackAfterOutputChangeChanged() {
+        let enabled = autoContinuePlaybackAfterOutputChangeButton.state == .on
+        guard onAutoContinuePlaybackAfterOutputChange?(enabled) == true else {
+            setAutoContinuePlaybackAfterOutputChange(autoContinuePlaybackAfterOutputChange)
+            return
+        }
+        autoContinuePlaybackAfterOutputChange = enabled
     }
 
     @objc private func applyHiddenUIDs() {

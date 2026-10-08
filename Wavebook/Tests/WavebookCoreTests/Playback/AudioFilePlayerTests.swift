@@ -139,6 +139,27 @@ import XCTest
         XCTAssertEqual(player.normalizationGainDB, 0)
     }
 
+    func testEngineConfigurationChangePausesPlaybackWhenOutputAutoContinueIsDisabled() throws {
+        let url = try makeWAV()
+        let player = makeSilentPlayer()
+        player.autoContinuePlaybackAfterOutputChange = false
+        var pauseWasReported = false
+        player.onPlaybackPausedAfterOutputChange = { pauseWasReported = true }
+        try player.play(url, normalizationGainDB: 0)
+        XCTAssertTrue(try player.seek(to: 0.2))
+        let elapsedBeforeChange = player.elapsedTime
+
+        player.handleEngineConfigurationChanged()
+
+        XCTAssertEqual(player.currentURL, url)
+        XCTAssertFalse(player.isPlaying)
+        XCTAssertTrue(pauseWasReported)
+        XCTAssertEqual(player.elapsedTime, elapsedBeforeChange, accuracy: 0.05)
+        try player.resume()
+        XCTAssertTrue(player.isPlaying)
+        player.stop()
+    }
+
     func testDefaultOutputDeviceChangeNotifiesWithoutCurrentTrack() {
         let player = makeSilentPlayer()
         var notificationCount = 0

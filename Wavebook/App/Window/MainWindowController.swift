@@ -96,8 +96,11 @@ final class MainWindowController: NSWindowController {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func handleMediaKey(_ command: MediaKeyCommand) -> Bool {
-        root.handleMediaKey(command)
+    func handleMediaKey(
+        _ command: MediaKeyCommand,
+        at timestamp: TimeInterval? = ProcessInfo.processInfo.systemUptime
+    ) -> Bool {
+        root.handleMediaKey(command, at: timestamp)
     }
 
     func addRoot() {

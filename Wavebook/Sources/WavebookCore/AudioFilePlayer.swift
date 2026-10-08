@@ -89,6 +89,8 @@ internal let defaultOutputDeviceAddress = AudioObjectPropertyAddress(
     internal var shouldBePlaying = false
     internal var playbackStartedAt: TimeInterval?
     internal var automaticSkipsDisabledForPlayback = false
+    /// Whether active playback automatically resumes after an audio-engine output change.
+    public var autoContinuePlaybackAfterOutputChange = true
     nonisolated(unsafe) internal var defaultOutputDeviceListener: AudioObjectPropertyListenerBlock?
     /// Called when playback reaches the end of the current item.
     public var onPlaybackFinished: (() -> Void)?
@@ -96,6 +98,8 @@ internal let defaultOutputDeviceAddress = AudioObjectPropertyAddress(
     public var onPlaybackFailed: ((Error, TimeInterval) -> Void)?
     /// Called when the default output device changes.
     public var onDefaultOutputDeviceChanged: (() -> Void)?
+    /// Called when a configured output change pauses active playback.
+    public var onPlaybackPausedAfterOutputChange: (() -> Void)?
     /// Called when silent segments are detected.
     public var onSilentSegmentsDetected: ((TimeInterval, TimeInterval) -> Void)?
     /// Called when an automatic silent-segment skip occurs.

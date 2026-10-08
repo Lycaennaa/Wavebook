@@ -6,12 +6,14 @@ final class OnboardingPersonalizationViewController: NSViewController {
     private let onAppearanceChanged: (AppAppearance) -> Void
     private let onReplayGainModeChanged: (ReplayGainMode) -> Bool
     private let onSkipSilentSegmentsChanged: (Bool) -> Bool
+    private let onAutoContinuePlaybackAfterOutputChange: (Bool) -> Bool
     private let onOpenEqualizer: () -> Void
     private let onBack: () -> Void
     private let onReturnToLibrary: () -> Void
     private let appearance: AppAppearance
     private var replayGainMode: ReplayGainMode
     private var skipSilentSegments: Bool
+    private var autoContinuePlaybackAfterOutputChange: Bool
 
     private let titleLabel = NSTextField(labelWithString: "Make Wavebook yours")
     private let descriptionLabel = NSTextField(
@@ -32,6 +34,11 @@ final class OnboardingPersonalizationViewController: NSViewController {
         target: nil,
         action: nil
     )
+    private let autoContinuePlaybackAfterOutputChangeButton = NSButton(
+        checkboxWithTitle: "Continue playback after output changes",
+        target: nil,
+        action: nil
+    )
     private let equalizerButton = NSButton(title: "Open 31-band EQ…", target: nil, action: nil)
     private let backButton = NSButton(title: "Back", target: nil, action: nil)
     private let skipStepButton = NSButton(title: "Skip Step", target: nil, action: nil)
@@ -42,9 +49,11 @@ final class OnboardingPersonalizationViewController: NSViewController {
         appearance: AppAppearance,
         replayGainMode: ReplayGainMode,
         skipSilentSegments: Bool,
+        autoContinuePlaybackAfterOutputChange: Bool,
         onAppearanceChanged: @escaping (AppAppearance) -> Void,
         onReplayGainModeChanged: @escaping (ReplayGainMode) -> Bool,
         onSkipSilentSegmentsChanged: @escaping (Bool) -> Bool,
+        onAutoContinuePlaybackAfterOutputChange: @escaping (Bool) -> Bool,
         onOpenEqualizer: @escaping () -> Void,
         onBack: @escaping () -> Void,
         onReturnToLibrary: @escaping () -> Void
@@ -52,14 +61,17 @@ final class OnboardingPersonalizationViewController: NSViewController {
         self.appearance = appearance
         self.replayGainMode = replayGainMode
         self.skipSilentSegments = skipSilentSegments
+        self.autoContinuePlaybackAfterOutputChange = autoContinuePlaybackAfterOutputChange
         self.onAppearanceChanged = onAppearanceChanged
         self.onReplayGainModeChanged = onReplayGainModeChanged
         self.onSkipSilentSegmentsChanged = onSkipSilentSegmentsChanged
+        self.onAutoContinuePlaybackAfterOutputChange = onAutoContinuePlaybackAfterOutputChange
         self.onOpenEqualizer = onOpenEqualizer
         self.onBack = onBack
         self.onReturnToLibrary = onReturnToLibrary
         super.init(nibName: nil, bundle: nil)
         skipSilentSegmentsButton.state = skipSilentSegments ? .on : .off
+        autoContinuePlaybackAfterOutputChangeButton.state = autoContinuePlaybackAfterOutputChange ? .on : .off
     }
 
     @available(*, unavailable)
@@ -121,6 +133,12 @@ final class OnboardingPersonalizationViewController: NSViewController {
         skipSilentSegmentsButton.contentTintColor = AppTheme.accent
         skipSilentSegmentsButton.setAccessibilityHelp(
             "Skip detected silence at the beginning and end of each song."
+        )
+        autoContinuePlaybackAfterOutputChangeButton.target = self
+        autoContinuePlaybackAfterOutputChangeButton.action = #selector(autoContinuePlaybackAfterOutputChangeChanged)
+        autoContinuePlaybackAfterOutputChangeButton.contentTintColor = AppTheme.accent
+        autoContinuePlaybackAfterOutputChangeButton.setAccessibilityHelp(
+            "Automatically resume the current song at its current position after the audio output changes."
         )
 
         equalizerButton.target = self
@@ -184,7 +202,7 @@ final class OnboardingPersonalizationViewController: NSViewController {
         navigation.spacing = 10
         let content = NSStackView(views: [
             titleLabel, descriptionLabel, appearanceSection, replayGainSection,
-            skipSilentSegmentsButton, equalizerSection, navigation
+            skipSilentSegmentsButton, autoContinuePlaybackAfterOutputChangeButton, equalizerSection, navigation
         ])
         content.orientation = .vertical
         content.alignment = .centerX
@@ -195,6 +213,7 @@ final class OnboardingPersonalizationViewController: NSViewController {
         replayGainSection.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         replayGainDescription.widthAnchor.constraint(equalTo: replayGainSection.widthAnchor).isActive = true
         skipSilentSegmentsButton.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        autoContinuePlaybackAfterOutputChangeButton.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         equalizerSection.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         equalizerDescription.widthAnchor.constraint(equalTo: equalizerSection.widthAnchor).isActive = true
         navigation.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
@@ -222,6 +241,15 @@ final class OnboardingPersonalizationViewController: NSViewController {
             return
         }
         skipSilentSegments = enabled
+    }
+
+    @objc private func autoContinuePlaybackAfterOutputChangeChanged() {
+        let enabled = autoContinuePlaybackAfterOutputChangeButton.state == .on
+        guard onAutoContinuePlaybackAfterOutputChange(enabled) else {
+            autoContinuePlaybackAfterOutputChangeButton.state = autoContinuePlaybackAfterOutputChange ? .on : .off
+            return
+        }
+        autoContinuePlaybackAfterOutputChange = enabled
     }
 
     @objc private func openEqualizer() {

@@ -54,6 +54,7 @@ final class PlaybackTransportController: PlaybackQueueTransport {
     var onPlaybackFailed: (() -> Void)?
     var onEvent: ((PlaybackSessionEvent) -> Void)?
     var onVolumeChanged: ((Float) -> Void)?
+    private var bluetoothDisconnectResumeTracker = BluetoothDisconnectResumeTracker()
 
     init(
         databaseProvider: @escaping () -> LibraryDatabase?,
@@ -106,6 +107,7 @@ final class PlaybackTransportController: PlaybackQueueTransport {
         audioPlayer.onPlaybackFailed = { [weak self] error, renderedPosition in
             self?.playbackFailed(error, renderedPosition: renderedPosition)
         }
+        configureOutputChangePlaybackCallback()
         audioPlayer.onSilentSegmentsDetected = { [weak self] leadingDuration, trailingDuration in
             self?.presentSilentSkip(leadingDuration: leadingDuration, trailingDuration: trailingDuration)
         }
@@ -120,9 +122,6 @@ final class PlaybackTransportController: PlaybackQueueTransport {
         }
     }
 
-    var isPlaying: Bool {
-        audioPlayer.isPlaying
-    }
     func readElapsedTime(notify: Bool = false) -> TimeInterval {
         let previousPreview = lyrics.preview
         let elapsed = withPresentationSuppressed { audioPlayer.elapsedTime }
@@ -179,6 +178,7 @@ final class PlaybackTransportController: PlaybackQueueTransport {
         onEvent?(.clearOperationalErrors(.database))
         return true
     }
+
     func loadSkipSegments(for track: Track) -> Result<[AudioSkipSegment], Error> {
         guard let database = databaseProvider() else {
             let error = PlaybackTransportError.databaseUnavailable
@@ -394,5 +394,89 @@ private extension PlaybackTransportController {
     private func presentSilentSkipCompleted(_ duration: TimeInterval) {
         guard let message = AudioPlaybackSkipMessage.completed(trailingDuration: duration) else { return }
         onEvent?(.presentOperationalMessage(message, kind: .general))
+    }
+}
+
+extension PlaybackTransportController {
+    var autoContinuePlaybackAfterOutputChange: Bool {
+        audioPlayer.autoContinuePlaybackAfterOutputChange
+    }
+
+    var isPlaying: Bool {
+        audioPlayer.isPlaying
+    }
+
+    func applySavedAutoContinuePlaybackAfterOutputChange(_ enabled: Bool) {
+        audioPlayer.autoContinuePlaybackAfterOutputChange = enabled
+        if !enabled {
+            bluetoothDisconnectResumeTracker.reset()
+        }
+    }
+
+    @discardableResult
+    func setAutoContinuePlaybackAfterOutputChange(_ enabled: Bool) -> Bool {
+        guard let database = databaseProvider() else {
+            onEvent?(.error(
+                PlaybackTransportError.databaseUnavailable,
+                message: "Could not save automatic playback continuation setting",
+                kind: .database
+            ))
+            return false
+        }
+        do {
+            try database.saveAutoContinuePlaybackAfterOutputChange(enabled)
+        } catch {
+            onEvent?(.error(
+                error,
+                message: "Could not save automatic playback continuation setting",
+                kind: .database
+            ))
+            return false
+        }
+        audioPlayer.autoContinuePlaybackAfterOutputChange = enabled
+        if !enabled {
+            bluetoothDisconnectResumeTracker.reset()
+        }
+        onEvent?(.clearOperationalErrors(.database))
+        return true
+    }
+
+    func noteMediaKeyPause(at timestamp: TimeInterval?) {
+        guard autoContinuePlaybackAfterOutputChange else {
+            bluetoothDisconnectResumeTracker.reset()
+            return
+        }
+        guard let timestamp else {
+            bluetoothDisconnectResumeTracker.reset()
+            return
+        }
+        if bluetoothDisconnectResumeTracker.recordRemotePause(at: timestamp) {
+            resumeAfterBluetoothDisconnect()
+        }
+    }
+
+    func noteBluetoothOutputDisconnect(at timestamp: TimeInterval) {
+        guard autoContinuePlaybackAfterOutputChange else {
+            bluetoothDisconnectResumeTracker.reset()
+            return
+        }
+        bluetoothDisconnectResumeTracker.recordBluetoothToNonBluetoothOutputChange(at: timestamp)
+    }
+
+    private func resumeAfterBluetoothDisconnect() {
+        guard autoContinuePlaybackAfterOutputChange,
+              hasAudioSource,
+              !isPlaying else { return }
+        _ = toggleCurrentPlayback()
+    }
+
+    private func configureOutputChangePlaybackCallback() {
+        audioPlayer.onPlaybackPausedAfterOutputChange = { [weak self] in
+            guard let self else { return }
+            self.progress.stop()
+            self.history.pause()
+            self.updateNowPlaying(state: .paused)
+            self.emitPresentationChanged()
+        }
     }
 }

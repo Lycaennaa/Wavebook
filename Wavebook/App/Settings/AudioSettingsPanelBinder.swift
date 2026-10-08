@@ -13,6 +13,7 @@ final class AudioSettingsPanelBinder {
         let onOutputDeviceChanged: (String?) -> Void
         let onHiddenOutputDeviceUIDsChanged: (Set<String>) -> Void
         let onSkipSilentSegmentsChanged: (Bool) -> Bool
+        let onAutoContinuePlaybackAfterOutputChange: (Bool) -> Bool
         let libraryFolders: LibraryFolderSettingsActions
         let onStartOnboarding: () -> Void
         let reactivate: () -> Void
@@ -38,6 +39,7 @@ final class AudioSettingsPanelBinder {
                 return
             }
         }
+        panel.onAutoContinuePlaybackAfterOutputChange = configuration.onAutoContinuePlaybackAfterOutputChange
         panel.configureLibraryFolders(configuration.libraryFolders)
         panel.onReplayGainAnalysisFileConcurrencyChanged = { [weak analysis, weak panel] value in
             analysis?.setFileConcurrency(value) { restoredValue in
@@ -50,6 +52,7 @@ final class AudioSettingsPanelBinder {
             hiddenUIDs: configuration.hiddenUIDs
         )
         panel.setSkipSilentSegments(configuration.playbackTransport.skipSilentSegments)
+        panel.setAutoContinuePlaybackAfterOutputChange(playbackTransport.autoContinuePlaybackAfterOutputChange)
         panel.setReplayGainAnalysisFileConcurrency(analysis.fileConcurrency)
         panel.setReplayGainService(analysis.service)
         self.panel = panel

@@ -5,6 +5,7 @@ import GRDB
 public struct LibraryStartupSettings: Equatable, Sendable {
     public let volume: Float
     public let skipSilentSegments: Bool
+    public let autoContinuePlaybackAfterOutputChange: Bool
     public let replayGainMode: ReplayGainMode
     public let replayGainAnalysisFileConcurrency: Int
     public let selectedOutputDeviceUID: String?
@@ -16,10 +17,12 @@ public struct LibraryStartupSettings: Equatable, Sendable {
         replayGainMode: ReplayGainMode,
         replayGainAnalysisFileConcurrency: Int,
         selectedOutputDeviceUID: String?,
-        hiddenOutputDeviceUIDs: Set<String>
+        hiddenOutputDeviceUIDs: Set<String>,
+        autoContinuePlaybackAfterOutputChange: Bool = true
     ) {
         self.volume = volume
         self.skipSilentSegments = skipSilentSegments
+        self.autoContinuePlaybackAfterOutputChange = autoContinuePlaybackAfterOutputChange
         self.replayGainMode = replayGainMode
         self.replayGainAnalysisFileConcurrency = replayGainAnalysisFileConcurrency
         self.selectedOutputDeviceUID = selectedOutputDeviceUID
@@ -47,6 +50,10 @@ extension LibraryDatabase {
                 database,
                 sql: "SELECT value FROM settings WHERE key = 'skipSilentSegments'"
             ) ?? 0) != 0
+            let autoContinuePlaybackAfterOutputChange = (try Double.fetchOne(
+                database,
+                sql: "SELECT value FROM settings WHERE key = 'autoContinuePlaybackAfterOutputChange'"
+            ) ?? 1) != 0
             let replayGainMode = ReplayGainMode(
                 rawValue: try String.fetchOne(
                     database,
@@ -80,7 +87,8 @@ extension LibraryDatabase {
                 replayGainMode: replayGainMode,
                 replayGainAnalysisFileConcurrency: concurrency,
                 selectedOutputDeviceUID: selectedUID?.isEmpty == true ? nil : selectedUID,
-                hiddenOutputDeviceUIDs: hiddenUIDs
+                hiddenOutputDeviceUIDs: hiddenUIDs,
+                autoContinuePlaybackAfterOutputChange: autoContinuePlaybackAfterOutputChange
             )
         }
     }
@@ -143,27 +151,52 @@ extension LibraryDatabase {
             )
         }
     }
-    /// Reads the normalized playback volume.
+    /// Reads normalized playback volume for an output device, falling back to the legacy volume.
     public func volume() throws -> Float {
-        try writer.read { database in
-            let value = try Double.fetchOne(database, sql: "SELECT value FROM settings WHERE key = 'volume'") ?? 1
+        try volume(forOutputDeviceUID: nil)
+    }
+
+    /// Reads the saved volume for an output device or the legacy volume when none is saved.
+    public func volume(forOutputDeviceUID deviceUID: String?) throws -> Float {
+        let key = Self.volumeSettingKey(forOutputDeviceUID: deviceUID)
+        return try writer.read { database in
+            let deviceValue = try key.flatMap { key in
+                try Double.fetchOne(database, sql: "SELECT value FROM settings WHERE key = ?", arguments: [key])
+            }
+            let value: Double
+            if let deviceValue {
+                value = deviceValue
+            } else {
+                value = try Double.fetchOne(database, sql: "SELECT value FROM settings WHERE key = 'volume'") ?? 1
+            }
             return Float(min(max(value, 0), 1))
         }
     }
 
-    /// Persists a normalized playback volume.
+    /// Persists the legacy playback volume.
     public func saveVolume(_ volume: Float) throws {
+        try saveVolume(volume, forOutputDeviceUID: nil)
+    }
+
+    /// Persists a normalized playback volume for an output device.
+    public func saveVolume(_ volume: Float, forOutputDeviceUID deviceUID: String?) throws {
+        let key = Self.volumeSettingKey(forOutputDeviceUID: deviceUID) ?? "volume"
         let safeVolume = volume.isFinite ? min(max(Double(volume), 0), 1) : 1
         try writer.write { database in
             try database.execute(
                 sql: """
                 INSERT INTO settings (key, value)
-                VALUES ('volume', ?)
+                VALUES (?, ?)
                 ON CONFLICT(key) DO UPDATE SET value = excluded.value
                 """,
-                arguments: [safeVolume]
+                arguments: [key, safeVolume]
             )
         }
+    }
+
+    private static func volumeSettingKey(forOutputDeviceUID deviceUID: String?) -> String? {
+        guard let uid = deviceUID?.trimmingCharacters(in: .whitespacesAndNewlines), !uid.isEmpty else { return nil }
+        return "volume:\(uid)"
     }
     /// Returns whether silent segments should be skipped.
     public func skipSilentSegments() throws -> Bool {
@@ -183,6 +216,20 @@ extension LibraryDatabase {
                 sql: """
                 INSERT INTO settings (key, value)
                 VALUES ('skipSilentSegments', ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                arguments: [enabled ? 1.0 : 0.0]
+            )
+        }
+    }
+
+    /// Persists whether playback should resume after an output-device change.
+    public func saveAutoContinuePlaybackAfterOutputChange(_ enabled: Bool) throws {
+        try writer.write { database in
+            try database.execute(
+                sql: """
+                INSERT INTO settings (key, value)
+                VALUES ('autoContinuePlaybackAfterOutputChange', ?)
                 ON CONFLICT(key) DO UPDATE SET value = excluded.value
                 """,
                 arguments: [enabled ? 1.0 : 0.0]

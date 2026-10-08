@@ -11,13 +11,16 @@ public struct OutputDevice: Equatable, Hashable, Sendable {
     public var name: String
     /// Whether this is the current default output.
     public var isDefault: Bool
+    /// Bluetooth transport status; nil when Core Audio cannot classify the device.
+    public var isBluetooth: Bool?
 
     /// Creates an output-device value.
-    public init(id: AudioDeviceID, uid: String, name: String, isDefault: Bool) {
+    public init(id: AudioDeviceID, uid: String, name: String, isDefault: Bool, isBluetooth: Bool? = false) {
         self.id = id
         self.uid = uid
         self.name = name
         self.isDefault = isDefault
+        self.isBluetooth = isBluetooth
     }
 }
 
@@ -48,7 +51,13 @@ public final class OutputDeviceProvider: Sendable {
                       let name = Self.stringProperty(kAudioObjectPropertyName, for: id) else {
                     return nil
                 }
-                return OutputDevice(id: id, uid: uid, name: name, isDefault: id == defaultID)
+                return OutputDevice(
+                    id: id,
+                    uid: uid,
+                    name: name,
+                    isDefault: id == defaultID,
+                    isBluetooth: Self.isBluetoothDevice(id)
+                )
             }
             .sorted(by: Self.devicePrecedes)
     }
@@ -73,6 +82,19 @@ public final class OutputDeviceProvider: Sendable {
     /// Returns the output device matching a UID.
     public func device(matchingUID uid: String) throws -> OutputDevice? {
         try devices().first { $0.uid == uid }
+    }
+    /// Returns whether a device is still present and ready for audio output.
+    public func isDeviceAvailable(id: AudioDeviceID) throws -> Bool {
+        guard try Self.deviceIDs().contains(id) else { return false }
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceIsAlive,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var isAlive: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        try Self.check(AudioObjectGetPropertyData(id, &address, 0, nil, &size, &isAlive))
+        return isAlive != 0
     }
 
     /// Returns the current default output device identifier.
@@ -132,6 +154,21 @@ public final class OutputDeviceProvider: Sendable {
         return value?.takeRetainedValue() as String?
     }
 
+    private static func isBluetoothDevice(_ id: AudioDeviceID) -> Bool? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyTransportType,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var transportType: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(id, &address, 0, nil, &size, &transportType) == noErr else { return nil }
+        if transportType == kAudioDeviceTransportTypeBluetooth
+            || transportType == kAudioDeviceTransportTypeBluetoothLE {
+            return true
+        }
+        return transportType == kAudioDeviceTransportTypeUnknown ? nil : false
+    }
     private static func check(_ status: OSStatus) throws {
         guard status == noErr else { throw OutputDeviceError.audioHardware(status) }
     }

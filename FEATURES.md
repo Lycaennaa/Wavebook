@@ -21,7 +21,8 @@ The following describes capabilities visible in the current source tree. Listed 
 - Control playback with macOS media keys and system playback commands.
 - View, zoom, and pan a playback waveform; seek by clicking or dragging on it.
 - Create track-specific skip segments and optionally skip detected silence at the start and end of songs.
-- Select an audio output device and adjust playback volume.
+- Select an audio output device; playback volume is saved separately for each output device.
+- Optionally resume the current song at its position when output changes, including macOS pausing on Bluetooth disconnect.
 
 ## Playlists and favorites
 

@@ -176,6 +176,9 @@ extension MainViewController {
             report(error, message: "Could not load startup settings", kind: .database)
             settings = nil
         }
+        playbackSession.transport.applySavedAutoContinuePlaybackAfterOutputChange(
+            settings?.autoContinuePlaybackAfterOutputChange ?? true
+        )
         if let settings {
             audioSettings.applySavedVolume(settings.volume)
             playbackSession.transport.applySavedSkipSilentSegments(settings.skipSilentSegments)

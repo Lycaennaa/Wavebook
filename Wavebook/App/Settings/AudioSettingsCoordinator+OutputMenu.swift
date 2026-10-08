@@ -53,4 +53,29 @@ extension AudioSettingsCoordinator {
         }
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 4), in: button)
     }
+    func defaultOutputDeviceChanged() {
+        defer { refreshSettingsOutputDevices() }
+        let disconnectObservedAt = ProcessInfo.processInfo.systemUptime
+        let previousOutputDeviceID = audioOutput.activeOutputDeviceID
+        let previousOutputWasBluetooth = audioOutput.isBluetoothOutput == true
+        let selectionSucceeded = selectOutputDevice(uid: nil)
+        if !selectionSucceeded, audioOutput.isBluetoothOutput == true {
+            _ = reconcileOutputDeviceSelection()
+        }
+        let previousOutputIsAvailable = previousOutputDeviceID.flatMap {
+            try? outputDevices.isDeviceAvailable(id: $0)
+        }
+        let isBluetoothDisconnect = BluetoothDisconnectDetection.isBluetoothDisconnect(
+            activeOutputIsBluetooth: previousOutputWasBluetooth,
+            defaultOutputIsBluetooth: try? outputDevices.defaultOutputDevice()?.isBluetooth,
+            activeOutputDeviceIsAvailable: previousOutputIsAvailable,
+            reconciledOutputIsBluetooth: audioOutput.isBluetoothOutput
+        )
+        if isBluetoothDisconnect {
+            playbackTransport.noteBluetoothOutputDisconnect(at: disconnectObservedAt)
+        }
+    }
+    func noteMediaKeyPause(at timestamp: TimeInterval?) {
+        playbackTransport.noteMediaKeyPause(at: timestamp)
+    }
 }

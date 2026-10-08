@@ -23,6 +23,25 @@ extension LibraryScannerTests {
         try database.saveVolume(2)
         XCTAssertEqual(try database.volume(), 1)
     }
+
+    func testOutputDeviceVolumesPersistSeparatelyAndFallBackToLegacyVolume() throws {
+        let path = try makeRoot().appending(path: "Library.sqlite").path
+
+        do {
+            let database = try LibraryDatabase(path: path)
+            try database.saveVolume(0.42)
+            XCTAssertEqual(try database.volume(forOutputDeviceUID: "device-1"), 0.42, accuracy: 0.001)
+
+            try database.saveVolume(0.25, forOutputDeviceUID: "device-1")
+            try database.saveVolume(2, forOutputDeviceUID: "device-2")
+        }
+
+        let reopened = try LibraryDatabase(path: path)
+        XCTAssertEqual(try reopened.volume(forOutputDeviceUID: "device-1"), 0.25, accuracy: 0.001)
+        XCTAssertEqual(try reopened.volume(forOutputDeviceUID: "device-2"), 1, accuracy: 0.001)
+        XCTAssertEqual(try reopened.volume(forOutputDeviceUID: "device-3"), 0.42, accuracy: 0.001)
+        XCTAssertEqual(try reopened.volume(), 0.42, accuracy: 0.001)
+    }
     func testSkipSilentSegmentsPersistsAndDefaultsOff() throws {
         let database = try LibraryDatabase(inMemory: true)
 
@@ -44,6 +63,19 @@ extension LibraryScannerTests {
 
         let reopened = try LibraryDatabase(path: path)
         XCTAssertTrue(try reopened.skipSilentSegments())
+    }
+
+    func testAutoContinuePlaybackAfterOutputChangeDefaultsOnAndPersistsAcrossReopen() throws {
+        let path = try makeRoot().appending(path: "Library.sqlite").path
+
+        do {
+            let database = try LibraryDatabase(path: path)
+            XCTAssertTrue(try database.startupSettings().autoContinuePlaybackAfterOutputChange)
+            try database.saveAutoContinuePlaybackAfterOutputChange(false)
+        }
+
+        let reopened = try LibraryDatabase(path: path)
+        XCTAssertFalse(try reopened.startupSettings().autoContinuePlaybackAfterOutputChange)
     }
 
     func testSelectedOutputDevicePersistsAndClears() throws {
