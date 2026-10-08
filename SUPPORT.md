@@ -23,8 +23,5 @@ Describe the use case, the local workflow it improves, and any relevant audio-fi
 
 For a downloaded release, report the tag, asset name, local SHA-256 result, GitHub-displayed asset digest, and macOS error. Do not bypass a digest mismatch or Gatekeeper warning by default; verify the ZIP and its provenance from the same GitHub Release.
 
-## Security issues
-
-Do not use a public issue for an unpatched vulnerability. Follow [SECURITY.md](SECURITY.md).
 
 No support response time or supported-version matrix is promised in this repository.

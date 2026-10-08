@@ -1,36 +1,18 @@
 # Changelog
 
-This file records user-visible changes when they are prepared for publication. The release workflow also generates GitHub release notes from version tags.
+This file records user-visible changes prepared for publication. The release workflow also generates GitHub release notes from version tags.
 
 ## Unreleased
-- Saved playback volume separately for each output device.
-- Added an auto-resume setting for output changes, including macOS media pauses on Bluetooth disconnect.
-- Added a fresh-install welcome screen with multi-folder setup, background scanning, and Help/Settings actions to reopen it.
-- Refined welcome copy and added Debug-only JSON reload for copy iteration.
-- Added a guided folder step with multi-folder management, per-folder audio progress, visible matched-lyric track counts, and early library access.
-- Added onboarding personalization for appearance, ReplayGain, and silence skipping, with a link to the existing 31-band EQ editor.
-- Completed Help/Settings onboarding reruns with current library and preference state, full folder management with safe removal confirmation, contextual LRCLIB privacy disclosure, accessible scan status, and clearer scan-error recovery.
 
-- Manage library folders in Settings, including removing indexed tracks without deleting audio files.
-- Kept song rows left-aligned and full-width beside the sidebar when growing or shrinking the window, including programmatic resizing.
-- Reused the shared DerivedData cache for local release packaging and kept package-time app modifications out of cached build products.
-- Added a filterable **Lyrics** playlist, exact playlist track counts, and clearer sidebar spacing.
-- Arranged playback controls in a compact two-row grid on the right side of the player.
-- Replaced the placeholder feature page with an implementation-based guide; corrected and expanded its capability descriptions to match the current source tree.
-- Replayed standalone tracks when repeat all or repeat one is enabled.
-- Queued selected artist, album, and playlist tracks within their full context and preserved repeat settings when queues change.
-- Added repository documentation for installation, privacy, contribution, support, security, conduct, and third-party attribution.
-- Preserved previously indexed tracks when descendant path resolution fails and rescan saved library roots at launch.
-- Aborted reconciliation when failed-path preservation limits are exceeded, keeping existing catalog rows instead of risking data loss.
-- Bounded startup library discovery with per-entry autorelease pools; the 250,000-entry limit counts directories and supported audio, LRC, and artwork sidecars, while unrelated files do not consume it. Over-limit scans preserve the existing catalog.
-- Prevented the songs list from auto-loading pages against zero-size collection geometry during startup.
-- Reuse cached track metadata on rescan when the file path, modification time, size, and bounded format preflight still match.
-- Skip catalog reconciliation on fully unchanged rescans after revalidating audio fingerprints and lyric paths.
-- Reconcile only changed or added tracks and prune missing paths without rewriting unchanged catalog rows.
-- Added native app menus and made remote Play acknowledge an accepted asynchronous shuffle request.
-- Deferred first Play-triggered shuffle until available saved library roots finish scanning.
-- Attested release ZIPs and checksum files with GitHub Actions provenance; version-tag release notes are generated automatically.
-- Included project and third-party license notices in release app bundles; corrected first-launch Gatekeeper instructions and added SwiftLint to CI and release checks.
-- Expanded the reusable Release performance suite with medium/large library scans, EQ profile imports and AVAudioUnitEQ application, album ReplayGain, shuffled queue navigation, production waveform disk loading/drawing, and process memory/I/O/energy counters. Optimized shuffled queue transitions/current-index lookup, EQ profile application and band matching, waveform PCM aggregation/rendering, and LRC offset-adjustment allocation.
+- Saved playback volume separately for each output device and added auto-resume when output changes, including macOS pauses on Bluetooth disconnect.
+- Added guided onboarding with multiple-folder setup, background scans, per-folder progress, matched-lyric counts, personalization, and Help/Settings reruns.
+- Added safe folder removal, which removes indexed tracks without deleting audio files.
+- Added the filterable **Lyrics** playlist and clearer playlist counts.
+- Improved repeat and queue behavior, including standalone-track repeat and context-aware queueing.
+- Added native app menus, improved remote Play handling during shuffle, and refined playback controls and song-list layout.
+- Improved scan reliability and rescan efficiency, preserving existing catalog data when paths fail or safety limits are exceeded.
+- Release ZIPs include GitHub Actions provenance attestations; GitHub Releases displays asset digests for verification.
+- Included project and third-party license notices in release app bundles and clarified first-launch Gatekeeper guidance.
+- Added separate user installation and developer setup guides, plus development, architecture, documentation-index, and safe-use guides.
 
 No published release entries are recorded in the current repository history.

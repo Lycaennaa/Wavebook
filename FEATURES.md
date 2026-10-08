@@ -10,7 +10,6 @@ The following describes capabilities visible in the current source tree. Listed 
 
 - Add one or more local folders and scan files with `mp3`, `flac`, `opus`, `m4a`, `aac`, `wav`, `aif`, `aiff`, `aifc`, and `caf` filename extensions.
 - Fresh installs open a welcome screen, guided folder step, and personalization step; multiple folders can be managed while scans run, with per-folder scanned/total audio progress and a prominent count of tracks matched to local lyrics for the most recently completed folder scan, plus recovery guidance for empty or failed scans. Help or Settings reopens onboarding with current folders and preferences. Removing a folder requires confirmation, removes its indexed tracks from Wavebook, and never deletes files from disk.
-- Manage library folders in Settings or onboarding; removing a folder removes its indexed tracks from Wavebook without deleting files from disk.
 - Browse and search songs, artists, albums, and genres; navigate between related catalog entries.
 - Read audio metadata and display embedded artwork or supported sidecar images named `cover`, `folder`, or `front`.
 
@@ -47,6 +46,6 @@ The following describes capabilities visible in the current source tree. Listed 
 
 - Record qualified listening history locally. View yearly and lifetime summaries, plays-per-day heatmaps, day timelines, rankings for songs, albums, artists, and genres, and top-skipped songs.
 - Enable private listening to stop recording history, or reset stored listening history.
-- Use System appearance by default, or choose Light, Dark, or AMOLED Black. Playback preferences such as volume, output device, ReplayGain, equalizer, and silence skipping persist locally.
+- Use System appearance by default. Playback preferences such as volume, output device, ReplayGain, equalizer, and silence skipping persist locally.
 
 See [PRIVACY.md](PRIVACY.md) for what these features read, write, and send outside the Mac.
