@@ -6,6 +6,9 @@ build/
 dist/
 /.runtime-build/
 /.xcodebuild-derived/
+/Wavebook.xcodeproj/project.pbxproj
+/Wavebook.xcodeproj/project.xcworkspace/contents.xcworkspacedata
+/Wavebook.xcodeproj/xcshareddata/xcschemes/
 
 .DS_Store
 /.tmp/

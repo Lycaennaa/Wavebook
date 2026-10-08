@@ -1,13 +1,13 @@
 # Contributing
 
-Wavebook is a macOS Swift application with a shared XcodeGen project and a standalone `WavebookCore` Swift package.
+Wavebook is a macOS Swift application with a `project.yml`-generated Xcode project and a standalone `WavebookCore` Swift package.
 
 ## Development requirements
 
 - macOS 15.0 or later.
 - Xcode 26.6 or later.
 - Git and Apple's Command Line Tools.
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen) 2.46.0 or later when regenerating the project.
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen) 2.46.0 or later to generate the local Xcode project.
 - The repository's `justfile` recipes also require the tools named by those recipes, including `[just](https://github.com/casey/just)` and SwiftLint where applicable. This justfile is for convenience.
 
 ## Project layout
@@ -17,18 +17,19 @@ Wavebook is a macOS Swift application with a shared XcodeGen project and a stand
 - `Wavebook/Tests/WavebookCoreTests` — Swift and XCTest coverage for the core module.
 - `project.yml` — canonical XcodeGen input.
 - `.github/workflows` — CI and release workflows.
-- `scripts` — package, privacy, lockfile, and generated-project checks.
+- `scripts` — repository tooling, project metadata, and lockfile checks.
 
 ## Local checks
 
 Run commands from the repository root.
 
-Regenerate and verify the committed Xcode project when `project.yml` changes:
+Regenerate the local Xcode project after editing `project.yml` or before opening it in Xcode:
 
 ```sh
 just generate-project
-git diff --exit-code -- Wavebook.xcodeproj
 ```
+
+`Wavebook.xcodeproj` is generated and ignored by Git. Build and test recipes regenerate it before invoking Xcode; `project.yml` remains the source of project and shared-scheme settings. The Xcode SwiftPM lockfile under the generated project remains tracked and must stay aligned with `Wavebook/Package.resolved`.
 
 Install local tools with Homebrew when needed:
 
@@ -39,7 +40,7 @@ just setup
 Run the repository checks when their tools are installed:
 
 ```sh
-just check # generated project, repository tooling, lint, and tests
+just check # project generation, repository tooling, lint, and tests
 just ci    # runner-parity checks plus Release build
 just test
 just lint
@@ -63,7 +64,7 @@ The local `just build`, `just build-release`, and `just test` recipes reuse `.bu
 
 - Add or update tests beside the affected `WavebookCore` behavior when a change affects behavior.
 - Keep user-facing behavior, permissions, network requests, persistence, and failure behavior documented when they change.
-- Do not edit generated Xcode project data as a substitute for changing `project.yml`.
+- Do not edit or commit generated Xcode project data; change `project.yml` instead.
 - Keep dependency pins and their notices synchronized when dependencies change.
 - Do not commit credentials, private library paths, generated build output, or user data.
 - Include the commands run and any known failures in a pull request description.

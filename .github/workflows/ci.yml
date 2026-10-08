@@ -52,7 +52,7 @@ jobs:
           swift --version
           python3 --version
 
-      - name: Generate and verify Xcode project
+      - name: Generate Xcode project
         shell: bash
         run: |
           set -euo pipefail
@@ -61,14 +61,14 @@ jobs:
           fi
           xcodegen --version
           xcodegen generate --spec project.yml
-          git diff --exit-code -- Wavebook.xcodeproj
+          test -f Wavebook.xcodeproj/project.pbxproj
 
       - name: Validate repository tooling
         shell: bash
         run: |
           set -euo pipefail
           sh -n scripts/install-hooks.sh
-          python3 -B scripts/check-pbx-identifiers.py
+          python3 -B scripts/check-project-metadata.py
           python3 -B scripts/check-package-locks.py
 
       - name: Run SwiftLint

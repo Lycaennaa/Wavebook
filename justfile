@@ -12,22 +12,22 @@ debug_products := derived_data + "/Build/Products/Debug"
 release_products := derived_data + "/Build/Products/Release"
 test_result_bundle := worktree_build_dir + "/test-results.xcresult"
 
-@build:
+@build: generate-project
     if [ "{{ distill_available }}" = "true" ]; then distill xcode build -- -scheme Wavebook -configuration Debug {{ xcode_build_options }}; else xcodebuild -project Wavebook.xcodeproj -scheme Wavebook -configuration Debug {{ xcode_build_options }} build; fi
 
-@build-release:
+@build-release: generate-project
     if [ "{{ distill_available }}" = "true" ]; then distill xcode build -- -scheme Wavebook -configuration Release {{ xcode_build_options }}; else xcodebuild -project Wavebook.xcodeproj -scheme Wavebook -configuration Release {{ xcode_build_options }} build; fi
 
-@build-release-move:
+@build-release-move: generate-project
     if [ "{{ distill_available }}" = "true" ]; then distill xcode build --mv -- -scheme Wavebook -configuration Release {{ xcode_build_options }}; else xcodebuild -project Wavebook.xcodeproj -scheme Wavebook -configuration Release {{ xcode_build_options }} build && mv "{{ release_products }}/Wavebook.app" /Applications/; fi
 
 @build-release-omv: build-release-move
     open /Applications/Wavebook.app
 
-@build-release-open:
+@build-release-open: generate-project
     if [ "{{ distill_available }}" = "true" ]; then distill xcode build --open -- -scheme Wavebook -configuration Release {{ xcode_build_options }}; else xcodebuild -project Wavebook.xcodeproj -scheme Wavebook -configuration Release {{ xcode_build_options }} build && open "{{ release_products }}/Wavebook.app"; fi
 
-@check: check-generated-project check-tooling check-pbx lint test
+@check: check-project check-tooling check-project-metadata lint test
 
 @check-ci-toolchain:
     #!/usr/bin/env bash
@@ -47,27 +47,14 @@ test_result_bundle := worktree_build_dir + "/test-results.xcresult"
         exit 1
     fi
 
-@check-generated-project:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    if ! command -v xcodegen >/dev/null 2>&1; then printf 'XcodeGen 2.46.0 or later is required\n' >&2; exit 1; fi
-    mkdir -p "{{ worktree_build_dir }}"
-    project_file="{{ worktree_root }}/Wavebook.xcodeproj/project.pbxproj"
-    original_project="$(mktemp "{{ worktree_build_dir }}/project.pbxproj.XXXXXX")"
-    cp "$project_file" "$original_project"
-    trap 'rm -f "$original_project"' EXIT
-    xcodegen generate --spec "{{ worktree_root }}/project.yml"
-    if ! cmp -s "$original_project" "$project_file"; then
-        diff -u "$original_project" "$project_file" || true
-        printf 'Generated project was out of date; review the regenerated project file\n' >&2
-        exit 1
-    fi
+@check-project: generate-project
+    test -f "{{ worktree_root }}/Wavebook.xcodeproj/project.pbxproj"
 
 @check-package-locks:
     python3 -B scripts/check-package-locks.py
 
-@check-pbx:
-    python3 -B scripts/check-pbx-identifiers.py
+@check-project-metadata:
+    python3 -B scripts/check-project-metadata.py
 
 @check-tooling: check-package-locks
     sh -n scripts/install-hooks.sh
@@ -77,9 +64,9 @@ test_result_bundle := worktree_build_dir + "/test-results.xcresult"
     set -euo pipefail
     export DEVELOPER_DIR="${WAVEBOOK_DEVELOPER_DIR:-/Applications/Xcode16.4.app/Contents/Developer}"
     just check-ci-toolchain
-    just check-generated-project
+    just check-project
     just check-tooling
-    just check-pbx
+    just check-project-metadata
     just lint
     just test
     just build-release
@@ -88,7 +75,7 @@ test_result_bundle := worktree_build_dir + "/test-results.xcresult"
     rm -rf "{{ worktree_build_dir }}"
 
 @generate-project:
-    xcodegen generate --spec project.yml
+    xcodegen generate --spec "{{ worktree_root }}/project.yml"
 
 @install-hooks:
     sh scripts/install-hooks.sh
@@ -109,7 +96,7 @@ test_result_bundle := worktree_build_dir + "/test-results.xcresult"
     if ! command -v xcodegen >/dev/null 2>&1; then HOMEBREW_NO_AUTO_UPDATE=1 brew install xcodegen; fi
     if ! command -v swiftlint >/dev/null 2>&1; then HOMEBREW_NO_AUTO_UPDATE=1 brew install swiftlint; fi
 
-@test:
+@test: generate-project
     #!/usr/bin/env bash
     set -euo pipefail
     mkdir -p "{{ worktree_build_dir }}"

@@ -18,7 +18,7 @@ Run at repo root:
 just ci       # runner-parity checks (Xcode 16.4 / Swift 6.1.2)
 just test     # WavebookTests scheme
 just lint
-just check-pbx
+just check-project-metadata
 ```
 
 Recipes need `just` (https://github.com/casey/just), and SwiftLint as applicable. Run smallest relevant check, broader checks when practical, and report actual commands/results. See `.github/workflows/ci.yml` for CI checks.
@@ -29,9 +29,9 @@ For parity with the current GitHub Actions toolchain, run:
 WAVEBOOK_DEVELOPER_DIR="/Applications/Xcode16.4.app/Contents/Developer" just ci
 ```
 
-`WAVEBOOK_DEVELOPER_DIR` must point to Xcode's `Contents/Developer` directory. `just ci` checks exact Xcode/Swift versions, regenerates and verifies the project, validates repository tooling, runs tests, and builds Release. `just test` retains `.build/test-results.xcresult` only when tests fail; export crash attachments with `xcrun xcresulttool export attachments --path .build/test-results.xcresult --output-path .build/test-attachments --only-failures`. Update the version check when CI's toolchain changes. `project.yml`'s `xcodeVersion` controls generated project metadata; it does not select the compiler.
+`WAVEBOOK_DEVELOPER_DIR` must point to Xcode's `Contents/Developer` directory. `just ci` checks exact Xcode/Swift versions, generates the project, validates repository tooling, runs tests, and builds Release. `just test` retains `.build/test-results.xcresult` only when tests fail; export crash attachments with `xcrun xcresulttool export attachments --path .build/test-results.xcresult --output-path .build/test-attachments --only-failures`. Update the version check when CI's toolchain changes. `project.yml`'s `xcodeVersion` controls generated project metadata; it does not select the compiler.
 
-For project changes, edit `project.yml`, run `xcodegen generate --spec project.yml`, and review generated diff; never hand-edit `Wavebook.xcodeproj`. Keep context-specific SwiftPM lockfile pins aligned; use `scripts/check-package-locks.py`.
+For project changes, edit `project.yml`; generate local Xcode files with `just generate-project`. `Wavebook.xcodeproj` is ignored except for its tracked SwiftPM lockfile. Keep context-specific SwiftPM lockfile pins aligned; use `scripts/check-package-locks.py`.
 
 Xcode 16.4 can be downloaded at https://developer.apple.com/download/all.
 
