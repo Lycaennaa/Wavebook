@@ -10,6 +10,19 @@ internal let defaultOutputDeviceAddress = AudioObjectPropertyAddress(
     mElement: kAudioObjectPropertyElementMain
 )
 
+/// Shared playback-volume bounds and first-install default.
+public enum PlaybackVolume {
+    /// Default volume seeded into newly created library databases.
+    public static let newInstallDefault: Float = 0.1
+    /// Maximum playback volume (200%).
+    public static let maximum: Float = 2
+    /// Clamps a volume value and uses the first-install default for non-finite input.
+    public static func normalized(_ volume: Double) -> Double {
+        guard volume.isFinite else { return Double(newInstallDefault) }
+        return min(max(volume, 0), Double(maximum))
+    }
+}
+
 /// Main-actor audio-file playback engine.
 @MainActor public final class AudioFilePlayer: NSObject {
     nonisolated internal static let logger = Logger(subsystem: "Wavebook", category: "audio-player")
@@ -30,6 +43,7 @@ internal let defaultOutputDeviceAddress = AudioObjectPropertyAddress(
     internal let equalizer = AVAudioUnitEQ(numberOfBands: EqualizerProfile.bandCount)
     internal var appliedEqualizerProfile: EqualizerProfile?
     internal let normalizationGain = AVAudioUnitEQ(numberOfBands: 0)
+    internal let volumeBoostGain = AVAudioUnitEQ(numberOfBands: 0)
     internal var playbackChunkLength = AVAudioFramePosition(UInt32.max)
     internal lazy var playbackScheduler: AudioFilePlaybackScheduler = {
         let scheduler = AudioFilePlaybackScheduler(player: player, maximumChunkLength: playbackChunkLength)
@@ -73,6 +87,7 @@ internal let defaultOutputDeviceAddress = AudioObjectPropertyAddress(
 
     internal var playbackID = 0
     internal var currentNormalizationGainDB = 0.0
+    internal var currentVolume: Float = 1
     internal var normalizationRampTask: Task<Void, Never>?
     internal var accumulatedElapsed: TimeInterval = 0
     internal var renderBaselineSampleTime: AVAudioFramePosition?

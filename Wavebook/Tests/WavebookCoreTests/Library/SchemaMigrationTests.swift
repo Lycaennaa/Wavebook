@@ -4,6 +4,29 @@ import GRDB
 import XCTest
 
 final class SchemaMigrationTests: XCTestCase {
+    func testSchema17WithoutSavedVolumeUsesLegacyDefault() throws {
+        let directory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent(".test-tmp", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let path = directory.appendingPathComponent("volume-\(UUID().uuidString).sqlite").path
+        addTeardownBlock { try? FileManager.default.removeItem(atPath: path) }
+
+        do {
+            let fixture = try LibraryDatabase(path: path)
+            try fixture.writer.write { connection in
+                try connection.execute(sql: "DELETE FROM settings WHERE key = 'volume'")
+            }
+        }
+
+        let database = try LibraryDatabase(path: path)
+        XCTAssertEqual(try database.startupSettings().volume, 1, accuracy: 0.001)
+        XCTAssertEqual(
+            try database.volume(forOutputDeviceUID: "device-without-volume"),
+            1,
+            accuracy: 0.001
+        )
+    }
+
     func testDatabaseInitializerMigratesSchema13To17AndRebuildsSearchData() throws {
         let path = try PlaylistSchemaTestSupport.makeLegacyDatabasePath(schemaVersion: 13)
         try PlaylistSchemaTestSupport.seedLegacySearchData(path: path)

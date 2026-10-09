@@ -71,14 +71,23 @@ import XCTest
         XCTAssertEqual(player.effectiveNormalizationGainDB, 0)
     }
 
-    func testVolumeClampsToPlayerRange() {
+    func testVolumeClampsToRangeAndAddsPostEQBoostAboveUnity() {
         let player = makeSilentPlayer()
 
         player.volume = -1
         XCTAssertEqual(player.volume, 0)
 
-        player.volume = 2
-        XCTAssertEqual(player.volume, 1)
+        player.volume = PlaybackVolume.maximum
+        XCTAssertEqual(player.volume, PlaybackVolume.maximum)
+        XCTAssertEqual(player.player.volume, 1)
+        XCTAssertEqual(
+            player.volumeBoostGain.globalGain,
+            Float(20 * log10(Double(PlaybackVolume.maximum))),
+            accuracy: 0.01
+        )
+
+        player.volume = PlaybackVolume.maximum + 1
+        XCTAssertEqual(player.volume, PlaybackVolume.maximum)
     }
 
     func testNormalizationGainClampsIndependentlyFromUserVolume() {

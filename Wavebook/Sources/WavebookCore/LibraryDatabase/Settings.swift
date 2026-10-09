@@ -35,15 +35,11 @@ extension LibraryDatabase {
     public func startupSettings() throws -> LibraryStartupSettings {
         try writer.read { database in
             let volume = Float(
-                min(
-                    max(
-                        try Double.fetchOne(
-                            database,
-                            sql: "SELECT value FROM settings WHERE key = 'volume'"
-                        ) ?? 1,
-                        0
-                    ),
-                    1
+                PlaybackVolume.normalized(
+                    try Double.fetchOne(
+                        database,
+                        sql: "SELECT value FROM settings WHERE key = 'volume'"
+                    ) ?? 1
                 )
             )
             let skipSilentSegments = (try Double.fetchOne(
@@ -151,7 +147,7 @@ extension LibraryDatabase {
             )
         }
     }
-    /// Reads normalized playback volume for an output device, falling back to the legacy volume.
+    /// Reads saved playback volume for an output device, falling back to the legacy value.
     public func volume() throws -> Float {
         try volume(forOutputDeviceUID: nil)
     }
@@ -167,9 +163,10 @@ extension LibraryDatabase {
             if let deviceValue {
                 value = deviceValue
             } else {
-                value = try Double.fetchOne(database, sql: "SELECT value FROM settings WHERE key = 'volume'") ?? 1
+                value = try Double.fetchOne(database, sql: "SELECT value FROM settings WHERE key = 'volume'")
+                    ?? 1
             }
-            return Float(min(max(value, 0), 1))
+            return Float(PlaybackVolume.normalized(value))
         }
     }
 
@@ -178,10 +175,10 @@ extension LibraryDatabase {
         try saveVolume(volume, forOutputDeviceUID: nil)
     }
 
-    /// Persists a normalized playback volume for an output device.
+    /// Persists playback volume for an output device.
     public func saveVolume(_ volume: Float, forOutputDeviceUID deviceUID: String?) throws {
         let key = Self.volumeSettingKey(forOutputDeviceUID: deviceUID) ?? "volume"
-        let safeVolume = volume.isFinite ? min(max(Double(volume), 0), 1) : 1
+        let safeVolume = PlaybackVolume.normalized(Double(volume))
         try writer.write { database in
             try database.execute(
                 sql: """

@@ -125,6 +125,11 @@ extension LibraryDatabase {
             PRIMARY KEY (key) ON CONFLICT REPLACE
         )
         """)
+
+        try database.execute(
+            sql: "INSERT OR IGNORE INTO settings (key, value) VALUES ('volume', ?)",
+            arguments: [Double(PlaybackVolume.newInstallDefault)]
+        )
         try database.execute(sql: """
         CREATE TABLE IF NOT EXISTS textSettings (
             key TEXT NOT NULL,

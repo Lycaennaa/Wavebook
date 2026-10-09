@@ -16,8 +16,13 @@ extension AudioFilePlayer {
 
     /// Returns or sets player volume.
     public var volume: Float {
-        get { player.volume }
-        set { player.volume = min(max(newValue, 0), 1) }
+        get { currentVolume }
+        set {
+            let safeVolume = Float(PlaybackVolume.normalized(Double(newValue)))
+            currentVolume = safeVolume
+            player.volume = min(safeVolume, 1)
+            volumeBoostGain.globalGain = safeVolume > 1 ? Float(20 * log10(Double(safeVolume))) : 0
+        }
     }
 
     /// Returns the current normalization gain.
@@ -73,11 +78,13 @@ extension AudioFilePlayer {
         engine.attach(player)
         engine.attach(normalizationGain)
         engine.attach(equalizer)
+        engine.attach(volumeBoostGain)
         engine.connect(player, to: normalizationGain, format: nil)
         engine.connect(normalizationGain, to: equalizer, format: nil)
-        engine.connect(equalizer, to: engine.mainMixerNode, format: nil)
+        engine.connect(equalizer, to: volumeBoostGain, format: nil)
+        engine.connect(volumeBoostGain, to: engine.mainMixerNode, format: nil)
         configureEqualizerBands()
-        player.volume = 1
+        volume = currentVolume
         setNormalizationGainDB(0)
         apply(equalizerProfile: .flat())
         NotificationCenter.default.addObserver(

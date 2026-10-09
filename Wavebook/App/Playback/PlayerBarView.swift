@@ -1,7 +1,7 @@
 import AppKit
 import WavebookCore
 
-final class PlayerBarView: ThemeBackgroundView {
+final class PlayerBarView: ThemeBackgroundView, NSTextFieldDelegate {
     var onTogglePlayback: (() -> Void)?
     var onPreviousPlayback: (() -> Void)?
     var onNextPlayback: (() -> Void)?
@@ -27,7 +27,7 @@ final class PlayerBarView: ThemeBackgroundView {
     private let genreLabel = MarqueeLabel()
     private let progressSlider = NSSlider(value: 0, minValue: 0, maxValue: 1, target: nil, action: nil)
     private let timeLabel = NSTextField(labelWithString: "0:00 / 0:00")
-    private let volumeSlider = NSSlider(value: 1, minValue: 0, maxValue: 1, target: nil, action: nil)
+    private let volumeControl = PlaybackBarVolumeControlView()
     private let controlsView = PlaybackBarControlsView()
     private let lyricsButton = NSButton(title: "", target: nil, action: nil)
     private let favoriteButton = NSButton(title: "", target: nil, action: nil)
@@ -80,11 +80,10 @@ final class PlayerBarView: ThemeBackgroundView {
         progressSlider.controlSize = .small
         timeLabel.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
         timeLabel.textColor = AppTheme.secondaryText
-        volumeSlider.target = self
-        volumeSlider.action = #selector(volumeChanged)
     }
 
     private func configureControlCallbacks() {
+        volumeControl.onVolumeChanged = { [weak self] volume in self?.onVolumeChanged?(volume) }
         controlsView.onTogglePlayback = { [weak self] in self?.onTogglePlayback?() }
         controlsView.onPreviousPlayback = { [weak self] in self?.onPreviousPlayback?() }
         controlsView.onNextPlayback = { [weak self] in self?.onNextPlayback?() }
@@ -99,8 +98,6 @@ final class PlayerBarView: ThemeBackgroundView {
         controlsView.onSkipSegmentsRequested = { [weak self] in self?.onSkipSegmentsRequested?() }
         controlsView.translatesAutoresizingMaskIntoConstraints = false
         progressSlider.setAccessibilityLabel("Playback Position")
-        volumeSlider.setAccessibilityLabel("Output Device Volume")
-        volumeSlider.toolTip = "Adjust volume for the current output device"
     }
 
     private func configureLyricsButton() {
@@ -127,13 +124,7 @@ final class PlayerBarView: ThemeBackgroundView {
         let metadataStack = NSStackView(views: [titleLabel, artistLabel, albumLabel, genreLabel])
         metadataStack.orientation = .vertical
         metadataStack.spacing = 2
-        let volumeLabel = NSTextField(labelWithString: "Vol")
-        volumeLabel.textColor = AppTheme.secondaryText
-        let volumeStack = NSStackView(views: [volumeLabel, volumeSlider])
-        volumeStack.orientation = .horizontal
-        volumeStack.spacing = 8
-        volumeSlider.widthAnchor.constraint(equalToConstant: 130).isActive = true
-        let infoStack = NSStackView(views: [metadataStack, volumeStack])
+        let infoStack = NSStackView(views: [metadataStack, volumeControl])
         infoStack.orientation = .vertical
         infoStack.alignment = .leading
         infoStack.spacing = 8
@@ -254,7 +245,7 @@ final class PlayerBarView: ThemeBackgroundView {
     }
 
     func setVolume(_ volume: Float) {
-        volumeSlider.doubleValue = min(max(Double(volume), 0), 1)
+        volumeControl.setVolume(volume)
     }
 
     func setEqualizerEnabled(_ enabled: Bool) {
@@ -327,10 +318,6 @@ final class PlayerBarView: ThemeBackgroundView {
 
     func setPrivateMode(_ enabled: Bool) {
         controlsView.setPrivateMode(enabled)
-    }
-
-    @objc private func volumeChanged() {
-        onVolumeChanged?(Float(volumeSlider.doubleValue))
     }
 
     @objc private func progressChanged() {

@@ -15,13 +15,27 @@ extension LibraryScannerTests {
     func testVolumePersistsAndClamps() throws {
         let database = try LibraryDatabase(inMemory: true)
 
-        XCTAssertEqual(try database.volume(), 1)
+        XCTAssertEqual(try database.volume(), PlaybackVolume.newInstallDefault, accuracy: 0.001)
+        XCTAssertEqual(try database.startupSettings().volume, PlaybackVolume.newInstallDefault, accuracy: 0.001)
 
         try database.saveVolume(0.42)
         XCTAssertEqual(try database.volume(), 0.42, accuracy: 0.001)
 
-        try database.saveVolume(2)
-        XCTAssertEqual(try database.volume(), 1)
+        try database.saveVolume(PlaybackVolume.maximum)
+        XCTAssertEqual(try database.volume(), PlaybackVolume.maximum, accuracy: 0.001)
+
+        try database.saveVolume(PlaybackVolume.maximum + 1)
+        XCTAssertEqual(try database.volume(), PlaybackVolume.maximum, accuracy: 0.001)
+    }
+
+    func testVolumeNormalizationClampsAndDefaultsNonFiniteValues() {
+        XCTAssertEqual(PlaybackVolume.normalized(-1), 0)
+        XCTAssertEqual(
+            PlaybackVolume.normalized(Double(PlaybackVolume.maximum) + 1),
+            Double(PlaybackVolume.maximum)
+        )
+        XCTAssertEqual(PlaybackVolume.normalized(.nan), Double(PlaybackVolume.newInstallDefault))
+        XCTAssertEqual(PlaybackVolume.normalized(.infinity), Double(PlaybackVolume.newInstallDefault))
     }
 
     func testOutputDeviceVolumesPersistSeparatelyAndFallBackToLegacyVolume() throws {
@@ -29,6 +43,11 @@ extension LibraryScannerTests {
 
         do {
             let database = try LibraryDatabase(path: path)
+            XCTAssertEqual(
+                try database.volume(forOutputDeviceUID: "device-1"),
+                PlaybackVolume.newInstallDefault,
+                accuracy: 0.001
+            )
             try database.saveVolume(0.42)
             XCTAssertEqual(try database.volume(forOutputDeviceUID: "device-1"), 0.42, accuracy: 0.001)
 
@@ -38,7 +57,7 @@ extension LibraryScannerTests {
 
         let reopened = try LibraryDatabase(path: path)
         XCTAssertEqual(try reopened.volume(forOutputDeviceUID: "device-1"), 0.25, accuracy: 0.001)
-        XCTAssertEqual(try reopened.volume(forOutputDeviceUID: "device-2"), 1, accuracy: 0.001)
+        XCTAssertEqual(try reopened.volume(forOutputDeviceUID: "device-2"), PlaybackVolume.maximum, accuracy: 0.001)
         XCTAssertEqual(try reopened.volume(forOutputDeviceUID: "device-3"), 0.42, accuracy: 0.001)
         XCTAssertEqual(try reopened.volume(), 0.42, accuracy: 0.001)
     }

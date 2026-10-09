@@ -14,7 +14,13 @@ final class SkipSegmentEditor: ThemeAwareView {
 
     private let waveformView = PlaybackWaveformView()
     private let playPauseButton = NSButton(title: "", target: nil, action: nil)
-    private let volumeSlider = NSSlider(value: 1, minValue: 0, maxValue: 1, target: nil, action: nil)
+    private let volumeSlider = NSSlider(
+        value: Double(PlaybackVolume.newInstallDefault),
+        minValue: 0,
+        maxValue: Double(PlaybackVolume.maximum),
+        target: nil,
+        action: nil
+    )
     private let zoomOutButton = NSButton(title: "−", target: nil, action: nil)
     private let zoomResetButton = NSButton(title: "100%", target: nil, action: nil)
     private let zoomInButton = NSButton(title: "+", target: nil, action: nil)
@@ -86,7 +92,7 @@ final class SkipSegmentEditor: ThemeAwareView {
     }
 
     func setVolume(_ volume: Float) {
-        volumeSlider.doubleValue = min(max(Double(volume), 0), 1)
+        volumeSlider.doubleValue = PlaybackVolume.normalized(Double(volume))
     }
 
     func setSegments(_ segments: [AudioSkipSegment]) {

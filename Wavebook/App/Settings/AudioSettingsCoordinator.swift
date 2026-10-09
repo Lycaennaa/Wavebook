@@ -53,7 +53,7 @@ final class AudioSettingsCoordinator {
     private func applySavedVolume(forOutputDeviceUID uid: String) {
         let volume: Float
         do {
-            volume = try databaseProvider()?.volume(forOutputDeviceUID: uid) ?? 1
+            volume = try databaseProvider()?.volume(forOutputDeviceUID: uid) ?? PlaybackVolume.newInstallDefault
             clear(.database)
         } catch {
             report(error, message: "Could not load saved volume", kind: .database)
@@ -63,9 +63,10 @@ final class AudioSettingsCoordinator {
     }
 
     func applySavedVolume(_ volume: Float) {
-        audioOutput.volume = volume
-        playerBar?.setVolume(volume)
-        onVolumeChanged?(volume)
+        let normalizedVolume = Float(PlaybackVolume.normalized(Double(volume)))
+        audioOutput.volume = normalizedVolume
+        playerBar?.setVolume(normalizedVolume)
+        onVolumeChanged?(normalizedVolume)
     }
 
     private func volumeOutputDeviceUID() throws -> String {
@@ -83,13 +84,14 @@ final class AudioSettingsCoordinator {
     }
 
     func setVolume(_ volume: Float) {
-        audioOutput.volume = volume
-        playerBar?.setVolume(volume)
-        onVolumeChanged?(volume)
+        let normalizedVolume = Float(PlaybackVolume.normalized(Double(volume)))
+        audioOutput.volume = normalizedVolume
+        playerBar?.setVolume(normalizedVolume)
+        onVolumeChanged?(normalizedVolume)
         do {
             if let database = databaseProvider() {
                 let uid = try volumeOutputDeviceUID()
-                try database.saveVolume(volume, forOutputDeviceUID: uid)
+                try database.saveVolume(normalizedVolume, forOutputDeviceUID: uid)
             }
             clear(.database)
         } catch {

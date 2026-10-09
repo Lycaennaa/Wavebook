@@ -189,7 +189,7 @@ extension MainViewController {
                 hiddenUIDs: settings.hiddenOutputDeviceUIDs
             )
         } else {
-            audioSettings.applySavedVolume(1)
+            audioSettings.applySavedVolume(PlaybackVolume.newInstallDefault)
             playbackSession.transport.applySavedSkipSilentSegments(false)
             playbackSession.replayGain.applySavedMode(.defaultValue)
             replayGainAnalysis.applySavedFileConcurrency(ReplayGain.defaultAnalysisFileConcurrency)
