@@ -288,4 +288,12 @@ extension LibraryDatabase {
         }
         return fallbackDate
     }
+    static func migrateFromSchema17(db database: Database) throws {
+        try addColumnIfMissing(
+            "securityScopedBookmark",
+            to: "roots",
+            definition: "securityScopedBookmark BLOB",
+            database: database
+        )
+    }
 }

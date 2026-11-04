@@ -7,6 +7,8 @@ public struct LibraryRoot: Identifiable, Hashable, Sendable {
     public var id: Int64
     /// Canonical root path.
     public var path: String
+    /// Security-scoped bookmark for the selected folder, when available.
+    public var securityScopedBookmark: Data?
     /// UTC time of the last scan.
     public var lastScanAt: Date?
 

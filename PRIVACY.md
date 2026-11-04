@@ -25,6 +25,8 @@ The source does not define how LRCLIB retains or processes request data. Review 
 
 The direct-download build disables App Sandbox so it can work with user-selected music folders and write adjacent lyric sidecars. Access is still constrained by macOS permissions and privacy controls. macOS may require the user to grant access to a protected folder or Full Disk Access.
 
+Wavebook stores a bookmark for each selected library folder in its local database. Where macOS provides a security-scoped bookmark, later scans reuse the selected access after relaunch; removing a library folder removes its bookmark.
+
 Review release assets before opening them. Do not add a library folder unless you want Wavebook to read its supported audio, artwork, metadata, and lyric files.
 
 ## Listening-history controls

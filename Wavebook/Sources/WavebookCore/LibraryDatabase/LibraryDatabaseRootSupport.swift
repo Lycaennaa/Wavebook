@@ -334,24 +334,90 @@ extension LibraryDatabase {
 
     /// Adds a library root and returns its identifier.
     @discardableResult
-    public func addRoot(path: String) throws -> Int64 {
+    public func addRoot(path: String, securityScopedBookmark: Data? = nil) throws -> Int64 {
         try writer.write { database in
-            try Self.ensureRoot(path: path, db: database)
+            let rootID = try Self.ensureRoot(path: path, db: database)
+            if let securityScopedBookmark {
+                try database.execute(
+                    sql: "UPDATE roots SET securityScopedBookmark = ? WHERE id = ?",
+                    arguments: [securityScopedBookmark, rootID]
+                )
+            }
+            return rootID
+        }
+    }
+
+    /// Updates the bookmark for an existing library root.
+    public func updateSecurityScopedBookmark(_ data: Data, forRootID id: Int64) throws {
+        try writer.write { database in
+            try database.execute(
+                sql: "UPDATE roots SET securityScopedBookmark = ? WHERE id = ?",
+                arguments: [data, id]
+            )
+        }
+    }
+
+    /// Updates a root's canonical path while preserving its ID and any existing bookmark.
+    /// Rejects paths overlapping another configured root.
+    public func updateRootPath(
+        _ path: String,
+        forRootID id: Int64,
+        securityScopedBookmark: Data? = nil
+    ) throws -> String {
+        let requestedIdentity = try Self.rootPathIdentity(for: path)
+        return try writer.write { database in
+            guard try Int64.fetchOne(
+                database,
+                sql: "SELECT id FROM roots WHERE id = ?",
+                arguments: [id]
+            ) != nil else {
+                throw LibraryDatabaseError.missingRoot(String(id))
+            }
+            let existingRoots = try Row.fetchAll(
+                database,
+                sql: "SELECT path FROM roots WHERE id != ? ORDER BY id",
+                arguments: [id]
+            )
+            for row in existingRoots {
+                let existingPath: String = row["path"]
+                // Existing paths are canonical on write; don't resolve other protected roots here.
+                let existingIdentity = RootPathIdentity(
+                    path: existingPath,
+                    isCaseSensitive: requestedIdentity.isCaseSensitive
+                )
+                guard !Self.rootPathsOverlap(requestedIdentity, existingIdentity) else {
+                    throw LibraryDatabaseError.overlappingRoot(
+                        requestedIdentity.path,
+                        existingPath: existingPath
+                    )
+                }
+            }
+            try database.execute(
+                sql: """
+                    UPDATE roots
+                    SET path = ?, securityScopedBookmark = COALESCE(?, securityScopedBookmark)
+                    WHERE id = ?
+                    """,
+                arguments: [requestedIdentity.path, securityScopedBookmark, id]
+            )
+            return requestedIdentity.path
         }
     }
 
     /// Returns all configured library roots.
+    /// Paths are canonicalized when added, so listing roots doesn't touch their folders.
     public func roots() throws -> [LibraryRoot] {
         try writer.read { database in
             let rows = try Row.fetchAll(
                 database,
-                sql: "SELECT id, path, lastScanAt FROM roots ORDER BY path COLLATE NOCASE, path"
+                sql: "SELECT id, path, lastScanAt, securityScopedBookmark FROM roots ORDER BY path COLLATE NOCASE, path"
             )
-            return try rows.map { row in
+            return rows.map { row in
                 let path: String = row["path"]
                 return LibraryRoot(
                     id: row["id"],
-                    path: try Self.resolveRootPath(path),
+                    path: path,
+                    securityScopedBookmark: row["securityScopedBookmark"],
                     lastScanAt: row["lastScanAt"]
                 )
             }

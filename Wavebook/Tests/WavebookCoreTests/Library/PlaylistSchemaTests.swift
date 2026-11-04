@@ -10,11 +10,11 @@ private struct PlaylistConstraintFixture {
 }
 
 final class PlaylistSchemaTests: XCTestCase {
-    func testFreshDatabaseCreatesSchemaV17PlaylistFoundation() throws {
+    func testFreshDatabaseCreatesSchemaV18PlaylistFoundation() throws {
         let database = try LibraryDatabase(inMemory: true)
 
         try database.writer.read { connection in
-            XCTAssertEqual(try Int.fetchOne(connection, sql: "PRAGMA user_version"), 17)
+            XCTAssertEqual(try Int.fetchOne(connection, sql: "PRAGMA user_version"), 18)
             XCTAssertEqual(
                 Array(try PlaylistSchemaTestSupport.tableColumns("tracks", db: connection).suffix(6)),
                 [

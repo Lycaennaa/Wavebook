@@ -20,7 +20,8 @@ extension LibraryDatabase {
             "roots": [
                 columnMetadata("id", type: "INTEGER"),
                 columnMetadata("path", type: "TEXT", notNull: true),
-                columnMetadata("lastScanAt", type: "DATETIME")
+                columnMetadata("lastScanAt", type: "DATETIME"),
+                columnMetadata("securityScopedBookmark", type: "BLOB")
             ],
             "tracks": [
                 columnMetadata("id", type: "INTEGER"),

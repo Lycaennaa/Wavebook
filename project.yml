@@ -161,6 +161,8 @@ targets:
       - path: Wavebook/App/Onboarding/OnboardingPersonalizationViewController.swift
       - path: Wavebook/App/Notifications/OperationalErrorKind.swift
       - path: Wavebook/App/Library/LibraryScanCoordinator.swift
+      - path: Wavebook/App/Library/LibraryScanCoordinatorRoots.swift
+      - path: Wavebook/App/Library/LibraryScanCoordinatorTypes.swift
       - path: Wavebook/App/Onboarding/OnboardingLaunchPolicy.swift
       - path: Wavebook/App/Onboarding/OnboardingFoldersViewController.swift
       - path: Wavebook/App/Settings/LibraryFoldersSettingsView.swift

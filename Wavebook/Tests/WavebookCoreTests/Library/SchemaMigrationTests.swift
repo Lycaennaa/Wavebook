@@ -27,27 +27,27 @@ final class SchemaMigrationTests: XCTestCase {
         )
     }
 
-    func testDatabaseInitializerMigratesSchema13To17AndRebuildsSearchData() throws {
+    func testDatabaseInitializerMigratesSchema13To18AndRebuildsSearchData() throws {
         let path = try PlaylistSchemaTestSupport.makeLegacyDatabasePath(schemaVersion: 13)
         try PlaylistSchemaTestSupport.seedLegacySearchData(path: path)
         addTeardownBlock { try? FileManager.default.removeItem(atPath: path) }
 
         let database = try LibraryDatabase(path: path)
         try database.writer.read { connection in
-            XCTAssertEqual(try Int.fetchOne(connection, sql: "PRAGMA user_version"), 17)
+            XCTAssertEqual(try Int.fetchOne(connection, sql: "PRAGMA user_version"), 18)
             try LibraryDatabase.validateSchema(db: connection)
         }
         try assertMigratedScopedSearchData(in: database)
     }
 
-    func testDatabaseInitializerMigratesSchema12Through17AndRebuildsSearchData() throws {
+    func testDatabaseInitializerMigratesSchema12Through18AndRebuildsSearchData() throws {
         let path = try PlaylistSchemaTestSupport.makeLegacyDatabasePath(schemaVersion: 12)
         try PlaylistSchemaTestSupport.seedLegacySearchData(path: path)
         addTeardownBlock { try? FileManager.default.removeItem(atPath: path) }
 
         let database = try LibraryDatabase(path: path)
         try database.writer.read { connection in
-            XCTAssertEqual(try Int.fetchOne(connection, sql: "PRAGMA user_version"), 17)
+            XCTAssertEqual(try Int.fetchOne(connection, sql: "PRAGMA user_version"), 18)
             XCTAssertNotNil(
                 try String.fetchOne(connection, sql: "SELECT name FROM sqlite_master WHERE name = 'trackSkipSegments'")
             )
@@ -56,12 +56,12 @@ final class SchemaMigrationTests: XCTestCase {
         try assertMigratedScopedSearchData(in: database)
     }
 
-    func testDatabaseInitializerMigratesSchemas15And16ThroughSearchRebuild() throws {
+    func testDatabaseInitializerMigratesSchemas15Through17ThroughSearchRebuild() throws {
         let directory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
             .appendingPathComponent(".test-tmp", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
-        for schemaVersion in [15, 16] {
+        for schemaVersion in [15, 16, 17] {
             let path = directory.appendingPathComponent("schema-\(schemaVersion)-\(UUID().uuidString).sqlite").path
             addTeardownBlock { try? FileManager.default.removeItem(atPath: path) }
             do {
@@ -79,15 +79,28 @@ final class SchemaMigrationTests: XCTestCase {
                             """,
                         arguments: [rootID, "/schema-\(schemaVersion)/Song.wav", "Song", "Artist", "Album"]
                     )
-                    try connection.execute(sql: "ALTER TABLE tracks DROP COLUMN albumSearchText")
-                    try connection.execute(sql: "ALTER TABLE tracks DROP COLUMN titleSearchText")
+                    if schemaVersion == 17 {
+                        try connection.execute(
+                            sql: "UPDATE tracks SET titleSearchText = ?, albumSearchText = ? WHERE path = ?",
+                            arguments: [
+                                SearchNormalizer.normalizedText("Song"),
+                                SearchNormalizer.normalizedText("Album"),
+                                "/schema-\(schemaVersion)/Song.wav"
+                            ]
+                        )
+                    }
+                    if schemaVersion < 17 {
+                        try connection.execute(sql: "ALTER TABLE tracks DROP COLUMN albumSearchText")
+                        try connection.execute(sql: "ALTER TABLE tracks DROP COLUMN titleSearchText")
+                    }
+                    try connection.execute(sql: "ALTER TABLE roots DROP COLUMN securityScopedBookmark")
                     try connection.execute(sql: "PRAGMA user_version = \(schemaVersion)")
                 }
             }
 
             let database = try LibraryDatabase(path: path)
             try database.writer.read { connection in
-                XCTAssertEqual(try Int.fetchOne(connection, sql: "PRAGMA user_version"), 17)
+                XCTAssertEqual(try Int.fetchOne(connection, sql: "PRAGMA user_version"), 18)
                 XCTAssertEqual(
                     try String.fetchOne(connection, sql: "SELECT titleSearchText FROM tracks WHERE title = 'Song'"),
                     SearchNormalizer.normalizedText("Song")
@@ -156,7 +169,7 @@ final class SchemaMigrationTests: XCTestCase {
 
         let database = try LibraryDatabase(path: path)
         try database.writer.read { connection in
-            XCTAssertEqual(try Int.fetchOne(connection, sql: "PRAGMA user_version"), 17)
+            XCTAssertEqual(try Int.fetchOne(connection, sql: "PRAGMA user_version"), 18)
             XCTAssertEqual(
                 try String.fetchOne(connection, sql: "SELECT fileVolumeIdentifier FROM tracks"),
                 "volume-1"

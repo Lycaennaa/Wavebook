@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 extension LibraryDatabase {
-    static let currentSchemaVersion = 17
+    static let currentSchemaVersion = 18
 
     nonisolated(unsafe) private static let createSchemaImplementation: (Database) throws -> Void = { database in
         let storedSchemaVersion = try Int.fetchOne(database, sql: "PRAGMA user_version") ?? 0
@@ -12,24 +12,28 @@ extension LibraryDatabase {
             || storedSchemaVersion == LibraryDatabase.currentSchemaVersion - 2
             || storedSchemaVersion == LibraryDatabase.currentSchemaVersion - 3
             || storedSchemaVersion == LibraryDatabase.currentSchemaVersion - 4
-            || storedSchemaVersion == LibraryDatabase.currentSchemaVersion - 5 else {
+            || storedSchemaVersion == LibraryDatabase.currentSchemaVersion - 5
+            || storedSchemaVersion == LibraryDatabase.currentSchemaVersion - 6 else {
             throw LibraryDatabaseError.unsupportedSchemaVersion(storedSchemaVersion)
         }
         let hasExistingSchema = try LibraryDatabase.hasUserTables(db: database)
         if hasExistingSchema {
-            if storedSchemaVersion == LibraryDatabase.currentSchemaVersion - 5
-                || storedSchemaVersion == LibraryDatabase.currentSchemaVersion - 4 {
+            if storedSchemaVersion == LibraryDatabase.currentSchemaVersion - 6
+                || storedSchemaVersion == LibraryDatabase.currentSchemaVersion - 5 {
                 try LibraryDatabase.migrateFromSchema12(db: database)
                 try LibraryDatabase.migrateFromSchema13(db: database)
                 try LibraryDatabase.migrateFromSchema14(db: database)
-            } else if storedSchemaVersion == LibraryDatabase.currentSchemaVersion - 3 {
+            } else if storedSchemaVersion == LibraryDatabase.currentSchemaVersion - 4 {
                 try LibraryDatabase.migrateFromSchema13(db: database)
                 try LibraryDatabase.migrateFromSchema14(db: database)
-            } else if storedSchemaVersion == LibraryDatabase.currentSchemaVersion - 2 {
+            } else if storedSchemaVersion == LibraryDatabase.currentSchemaVersion - 3 {
                 try LibraryDatabase.migrateFromSchema14(db: database)
             }
-            if storedSchemaVersion > 0, storedSchemaVersion < LibraryDatabase.currentSchemaVersion {
+            if storedSchemaVersion > 0, storedSchemaVersion < 17 {
                 try LibraryDatabase.migrateFromSchema16(db: database)
+            }
+            if storedSchemaVersion < LibraryDatabase.currentSchemaVersion {
+                try LibraryDatabase.migrateFromSchema17(db: database)
             }
             try LibraryDatabase.validateSchema(db: database)
             try database.execute(sql: "PRAGMA user_version = \(LibraryDatabase.currentSchemaVersion)")
@@ -42,7 +46,8 @@ extension LibraryDatabase {
         CREATE TABLE IF NOT EXISTS roots (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             path TEXT NOT NULL UNIQUE ON CONFLICT REPLACE,
-            lastScanAt DATETIME
+            lastScanAt DATETIME,
+            securityScopedBookmark BLOB
         )
         """)
 

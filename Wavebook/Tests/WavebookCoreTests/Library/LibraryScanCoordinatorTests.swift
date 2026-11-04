@@ -42,6 +42,7 @@ final class LibraryScanCoordinatorTests: XCTestCase {
         let removal = Task { await coordinator.removeRoot(registeredRoot) }
         await fulfillment(of: [gate.scanCancelled], timeout: 10)
         coordinator.cancel()
+        XCTAssertFalse(coordinator.isScanning)
         gate.resumeScan()
         await removal.value
 
@@ -93,6 +94,111 @@ final class LibraryScanCoordinatorTests: XCTestCase {
         await fulfillment(of: [emptyRootStatePublished], timeout: 10)
 
         XCTAssertTrue(try database.roots().isEmpty)
+    }
+    func testMovedFolderBookmarkRescansAndUpdatesStoredRootPath() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Wavebook-\(UUID().uuidString)", isDirectory: true)
+        let movedRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Wavebook-Moved-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: root)
+            try? FileManager.default.removeItem(at: movedRoot)
+        }
+
+        let database = try LibraryDatabase(inMemory: true)
+        let firstScanCompleted = expectation(description: "Selected folder scan completes")
+        let coordinator = LibraryScanCoordinator(
+            databaseProvider: { database },
+            scan: { _, _, _, _ in
+                LibraryScanResult(
+                    tracks: [],
+                    matchedLyricTrackCount: 0,
+                    failures: [],
+                    failedCandidateCount: 0
+                )
+            },
+            onEvent: { _ in },
+            onLibraryChanged: { firstScanCompleted.fulfill() },
+            onReplayGainStart: {}
+        )
+        coordinator.addRoots([root])
+        await fulfillment(of: [firstScanCompleted], timeout: 10)
+
+        let registeredRoot = try XCTUnwrap(try database.roots().first)
+        XCTAssertNotNil(registeredRoot.securityScopedBookmark)
+        try FileManager.default.moveItem(at: root, to: movedRoot)
+        let canonicalMovedRootPath = LibraryDatabase.canonicalRootPath(movedRoot.path)
+
+        let rescanStarted = expectation(description: "Saved folder bookmark follows a move")
+        let rescanCompleted = expectation(description: "Moved saved folder rescan completes")
+        let restoredCoordinator = LibraryScanCoordinator(
+            databaseProvider: { database },
+            scan: { restoredRoot, _, _, _ in
+                XCTAssertEqual(restoredRoot.path, canonicalMovedRootPath)
+                XCTAssertTrue(FileManager.default.fileExists(atPath: restoredRoot.path))
+                rescanStarted.fulfill()
+                return LibraryScanResult(
+                    tracks: [],
+                    matchedLyricTrackCount: 0,
+                    failures: [],
+                    failedCandidateCount: 0
+                )
+            },
+            onEvent: { _ in },
+            onLibraryChanged: {},
+            onReplayGainStart: {}
+        )
+        var rescanSucceeded: Bool?
+        restoredCoordinator.rescanPersistedRoots(startReplayGain: false) { succeeded in
+            rescanSucceeded = succeeded
+            rescanCompleted.fulfill()
+        }
+        await fulfillment(of: [rescanStarted, rescanCompleted], timeout: 10)
+        XCTAssertEqual(rescanSucceeded, true)
+        let updatedRoot = try XCTUnwrap(try database.roots().first)
+        XCTAssertEqual(updatedRoot.id, registeredRoot.id)
+        XCTAssertEqual(updatedRoot.path, canonicalMovedRootPath)
+        XCTAssertNotNil(updatedRoot.securityScopedBookmark)
+        XCTAssertFalse(restoredCoordinator.isScanning)
+    }
+
+    func testMissingPersistedRootCompletesAsFailureWithoutScanning() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Wavebook-Missing-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let database = try LibraryDatabase(inMemory: true)
+        _ = try database.addRoot(path: root.path, securityScopedBookmark: Data([0]))
+        try FileManager.default.removeItem(at: root)
+
+        let rescanCompleted = expectation(description: "Missing saved root reports failure")
+        var rescanSucceeded: Bool?
+        var scanCalled = false
+        let coordinator = LibraryScanCoordinator(
+            databaseProvider: { database },
+            scan: { _, _, _, _ in
+                scanCalled = true
+                return LibraryScanResult(
+                    tracks: [],
+                    matchedLyricTrackCount: 0,
+                    failures: [],
+                    failedCandidateCount: 0
+                )
+            },
+            onEvent: { _ in },
+            onLibraryChanged: {},
+            onReplayGainStart: {}
+        )
+        coordinator.rescanPersistedRoots(startReplayGain: false) { succeeded in
+            rescanSucceeded = succeeded
+            rescanCompleted.fulfill()
+        }
+
+        await fulfillment(of: [rescanCompleted], timeout: 10)
+        XCTAssertEqual(rescanSucceeded, false)
+        XCTAssertFalse(scanCalled)
     }
 
     func testAddingMultipleRootsKeepsScanActivityUntilAllScansFinish() async throws {
@@ -324,18 +430,18 @@ final class LibraryScanCoordinatorTests: XCTestCase {
 }
 
 @MainActor
-private final class LibraryScanGate {
+final class LibraryScanGate {
     let scanStarted = XCTestExpectation(description: "Canonical scan starts")
     let scanCancelled = XCTestExpectation(description: "Root removal cancels scan")
     private(set) var scannedRootPath: String?
     private var resumeContinuation: CheckedContinuation<Void, Never>?
 
-    func pauseScan(at rootPath: String) async throws {
+    func pauseScan(at rootPath: String, ignoresCancellation: Bool = false) async throws {
         scannedRootPath = rootPath
         scanStarted.fulfill()
         try await withTaskCancellationHandler {
             await withCheckedContinuation { resumeContinuation = $0 }
-            try Task.checkCancellation()
+            if !ignoresCancellation { try Task.checkCancellation() }
         } onCancel: { [weak self] in
             Task { @MainActor in
                 self?.scanCancelled.fulfill()
