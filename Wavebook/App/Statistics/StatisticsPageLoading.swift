@@ -6,6 +6,7 @@ extension StatisticsPageViewController {
 
     func refresh() {
     guard statisticsLoader.isActivePage else { return }
+        timelineTimeZone = TimeZone.current
         if isViewLoaded { layoutRegions() }
         refreshStatusOnly()
         let year = statisticsModel.displayedYear
@@ -51,7 +52,8 @@ extension StatisticsPageViewController {
         if let selectedDay, selectedDay.year != snapshot.year {
             selectDay(nil)
         } else if selectedDay != nil {
-            timelineStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+            clearTimelineEntries()
+            removeTimelineFailureNote()
             statisticsModel.setTimelineCursor(nil)
             refreshDayData()
             loadTimelinePage(cursor: nil)
@@ -72,6 +74,7 @@ extension StatisticsPageViewController {
         }
         statusLabel.stringValue = lines.joined(separator: "\n")
         resetButton.isEnabled = !statisticsModel.isResetInFlight && trackerProvider() != nil
+        updateTimelineSelectionControls()
         updateNavigation()
         layoutRegions()
     }
@@ -117,8 +120,10 @@ extension StatisticsPageViewController {
 
     func selectDay(_ day: ListeningLocalDay?) {
         guard statisticsModel.selectDay(day) else { return }
+        timelineTimeZone = TimeZone.current
         statisticsLoader.cancelDayAndTimeline()
-        timelineStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        clearTimelineEntries()
+        removeTimelineFailureNote()
         heatmapView.reload(days: statisticsModel.yearSnapshot?.heatmap ?? [], selectedDay: day)
         guard let day else {
             dayTitleLabel.stringValue = ""
@@ -126,6 +131,7 @@ extension StatisticsPageViewController {
             dayTitleLabel.isHidden = true
             daySummaryLabel.isHidden = true
             timelineStack.isHidden = true
+            timelineControlsStack.isHidden = true
             loadMoreButton.isHidden = true
             // The day snapshot replaced these with day-scoped data; restore
             // the year view that was showing before selection.
@@ -140,6 +146,7 @@ extension StatisticsPageViewController {
         }
         dayTitleLabel.isHidden = false
         daySummaryLabel.isHidden = false
+        timelineControlsStack.isHidden = false
         timelineStack.isHidden = false
         dayTitleLabel.stringValue = dateFormatter.string(
             from: dateFor(day: day)
@@ -183,6 +190,7 @@ extension StatisticsPageViewController {
         let started = statisticsLoader.loadTimelinePage(
             day: day,
             cursor: cursor,
+            timeZone: timelineTimeZone,
             databaseProvider: databaseProvider
         ) { [weak self] result in
             guard let self else { return }
@@ -195,15 +203,7 @@ extension StatisticsPageViewController {
             case .success(let page):
                 self.removeTimelineFailureNote()
                 self.statisticsModel.setTimelineCursor(page.nextCursor)
-                for entry in page.entries {
-                    self.timelineStack.addArrangedSubview(self.timelineRow(entry))
-                }
-                if page.entries.isEmpty, cursor == nil {
-                    let none = NSTextField(labelWithString: "No qualified plays this day.")
-                    none.font = .systemFont(ofSize: 12)
-                    none.textColor = AppTheme.secondaryText
-                    self.timelineStack.addArrangedSubview(none)
-                }
+                self.appendTimelineEntries(page.entries)
                 self.loadMoreButton.isHidden = page.nextCursor == nil
                 self.layoutRegions()
             }
@@ -221,21 +221,9 @@ extension StatisticsPageViewController {
         timelineStack.addArrangedSubview(note)
     }
 
-    private func removeTimelineFailureNote() {
+    func removeTimelineFailureNote() {
         timelineFailureNote?.removeFromSuperview()
         timelineFailureNote = nil
-    }
-
-    private func timelineRow(_ entry: ListeningQualifiedPlayTimelineEntry) -> NSView {
-        timeFormatter.timeZone = TimeZone(secondsFromGMT: entry.utcOffsetSeconds)
-        let row = NSTextField(labelWithString: "\(timeFormatter.string(from: entry.qualifiedAtUTC)) — "
-            + "\(entry.title) · \(entry.artistDisplay) · \(entry.albumTitle)")
-        row.font = .systemFont(ofSize: 12)
-        row.textColor = AppTheme.primaryText
-        row.lineBreakMode = .byTruncatingTail
-        row.translatesAutoresizingMaskIntoConstraints = false
-        row.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        return row
     }
 
     private func dateFor(day: ListeningLocalDay) -> Date {

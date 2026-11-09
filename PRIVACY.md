@@ -31,4 +31,4 @@ Review release assets before opening them. Do not add a library folder unless yo
 
 ## Listening-history controls
 
-Listening history is local. Private listening-history mode prevents new playback sessions from being persisted while it is enabled. Resetting history is a separate action that removes the stored listening-history data. Neither control changes the audio files in the selected library.
+Listening history is local. Private listening-history mode prevents new playback sessions from being persisted while it is enabled. Resetting history removes all stored listening-history data. Removing a qualified-play entry deletes its event, attached listened-time and skip data, and any media snapshot no longer used by another event. Undo keeps the latest removal batch in memory for the current app session; it is not persisted. Neither removal nor reset changes audio files in the selected library.

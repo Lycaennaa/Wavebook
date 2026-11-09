@@ -50,6 +50,8 @@ public struct ListeningQualifiedPlayTimelineEntry: Identifiable, Equatable, Send
     public let localDay: ListeningLocalDay
     /// UTC offset in seconds for the local day.
     public let utcOffsetSeconds: Int
+    /// Whether playback for this event has ended.
+    public let isFinalized: Bool
     /// Snapshot associated with the play.
     public let snapshotID: Int64
     /// Track title.
@@ -69,6 +71,7 @@ public struct ListeningQualifiedPlayTimelineEntry: Identifiable, Equatable, Send
         localDay: ListeningLocalDay,
         utcOffsetSeconds: Int,
         snapshotID: Int64,
+        isFinalized: Bool = true,
         title: String = "",
         artistDisplay: String = "",
         albumTitle: String = ""
@@ -78,6 +81,7 @@ public struct ListeningQualifiedPlayTimelineEntry: Identifiable, Equatable, Send
         self.localDay = localDay
         self.utcOffsetSeconds = utcOffsetSeconds
         self.snapshotID = snapshotID
+        self.isFinalized = isFinalized
         self.title = title.listeningTrimmed
         self.artistDisplay = artistDisplay.listeningTrimmed
         self.albumTitle = albumTitle.listeningTrimmed

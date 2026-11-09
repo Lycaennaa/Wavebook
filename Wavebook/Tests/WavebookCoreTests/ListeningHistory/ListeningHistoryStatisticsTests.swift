@@ -304,6 +304,7 @@ extension ListeningHistoryTests {
              "Artist B"
          )
      }
+
     private func makeStatisticsTestRoot() throws -> URL {
         let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
             .appending(path: ".tmp/listening-rescan-root-\(UUID().uuidString)")

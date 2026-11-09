@@ -36,6 +36,7 @@ extension StatisticsPageViewController {
             isPlaying: isPlayingProvider()
         )
         if succeeded {
+            clearHistoryRemovalUndo()
             selectDay(nil)
             refreshStatusOnly()
             refresh()

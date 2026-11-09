@@ -197,3 +197,10 @@ public struct ListeningEvent: Identifiable, Equatable, Sendable {
         self.daySlices = daySlices
     }
 }
+
+/// In-memory restoration data for a removed batch of listening events.
+public struct ListeningHistoryDeletion: Sendable {
+    let events: [ListeningEvent]
+    let snapshots: [ListeningMediaSnapshot]
+
+}

@@ -58,7 +58,7 @@ final class ArtistAlbumRowView: ThemeAwareControl {
     }
     override func themeDidChange() {
         super.themeDidChange()
-        layer?.backgroundColor = AppTheme.cgColor(isHovered ? AppTheme.selection : AppTheme.background, in: self)
+        layer?.backgroundColor = AppTheme.cgColor(isHovered ? AppTheme.hover : AppTheme.background, in: self)
         artworkView.layer?.backgroundColor = AppTheme.cgColor(AppTheme.raised, in: artworkView)
     }
 

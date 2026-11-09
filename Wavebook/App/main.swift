@@ -215,11 +215,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func undo(_ sender: Any?) {
-        NSApp.keyWindow?.firstResponder?.undoManager?.undo()
+        let window = NSApp.keyWindow
+        if let responderUndoManager = window?.firstResponder?.undoManager,
+           responderUndoManager.canUndo {
+            responderUndoManager.undo()
+        } else {
+            window?.undoManager?.undo()
+        }
     }
 
     @objc private func redo(_ sender: Any?) {
-        NSApp.keyWindow?.firstResponder?.undoManager?.redo()
+        let window = NSApp.keyWindow
+        if let responderUndoManager = window?.firstResponder?.undoManager,
+           responderUndoManager.canRedo {
+            responderUndoManager.redo()
+        } else {
+            window?.undoManager?.redo()
+        }
     }
 
     private func registerRemoteCommands() {

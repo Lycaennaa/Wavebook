@@ -264,7 +264,8 @@ extension LibraryDatabase {
     public func qualifiedPlayTimeline(
         day: ListeningLocalDay,
         cursor: ListeningTimelineCursor? = nil,
-        limit: Int = 100
+        limit: Int = 100,
+        timeZone: TimeZone = .current
     ) throws -> ListeningQualifiedPlayTimelinePage {
         try Self.validateListeningScope(year: nil, day: day)
         let limit = min(max(limit, 1), 100)
@@ -273,6 +274,7 @@ extension LibraryDatabase {
                 day: day,
                 cursor: cursor,
                 limit: limit,
+                timeZone: timeZone,
                 database: database
             )
         }
@@ -282,12 +284,12 @@ extension LibraryDatabase {
         day: ListeningLocalDay,
         cursor: ListeningTimelineCursor?,
         limit: Int,
+        timeZone: TimeZone,
         database: Database
     ) throws -> ListeningQualifiedPlayTimelinePage {
-        guard let range = Self.currentTimeZoneDateRange(for: day) else {
+        guard let range = Self.currentTimeZoneDateRange(for: day, timeZone: timeZone) else {
             throw LibraryDatabaseError.invalidListeningDay(day.rawValue)
         }
-        let timeZone = TimeZone.current
         var arguments: StatementArguments = [range.start, range.endExclusive]
         var cursorPredicate = ""
         if let cursor {
@@ -301,7 +303,7 @@ extension LibraryDatabase {
         let rows = try Row.fetchAll(
             database,
             sql: """
-            SELECT e.id, e.qualifiedAtUTC,
+            SELECT e.id, e.qualifiedAtUTC, e.endedAtUTC IS NOT NULL AS isFinalized,
                    s.id AS snapshotID, s.title, s.artistDisplay, s.albumTitle
             FROM listeningEvents e
             JOIN listeningMediaSnapshots s ON s.id = e.snapshotId
@@ -341,6 +343,7 @@ extension LibraryDatabase {
             localDay: localDay,
             utcOffsetSeconds: timeZone.secondsFromGMT(for: qualifiedAtUTC),
             snapshotID: row["snapshotID"],
+            isFinalized: row["isFinalized"],
             title: row["title"],
             artistDisplay: row["artistDisplay"],
             albumTitle: row["albumTitle"]

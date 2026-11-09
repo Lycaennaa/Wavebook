@@ -170,6 +170,7 @@ targets:
       - path: Wavebook/App/TextEditingShortcut.swift
       - path: Wavebook/App/SongList/SongListPaginationPolicy.swift
       - path: Wavebook/App/StatisticsHeatmapView.swift
+      - path: Wavebook/App/Statistics/StatisticsTimelineSelection.swift
       - path: Wavebook/App/AppTheme.swift
       - path: Wavebook/App/AppAppearance.swift
       - path: Wavebook/App/ThemeAwareViews.swift

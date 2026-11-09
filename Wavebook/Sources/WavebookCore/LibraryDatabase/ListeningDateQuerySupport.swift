@@ -7,11 +7,12 @@ struct ListeningDateRange {
 extension LibraryDatabase {
     static func currentTimeZoneDateRange(
         from startDay: ListeningLocalDay,
-        through endDay: ListeningLocalDay
+        through endDay: ListeningLocalDay,
+        timeZone: TimeZone = .current
     ) -> ListeningDateRange? {
         guard startDay <= endDay else { return nil }
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = .current
+        calendar.timeZone = timeZone
         guard let startInterval = currentTimeZoneDayInterval(startDay, calendar: calendar),
               let endInterval = currentTimeZoneDayInterval(endDay, calendar: calendar) else {
             return nil
@@ -44,8 +45,11 @@ extension LibraryDatabase {
         return calendar.dateInterval(of: .day, for: noon)
     }
 
-    static func currentTimeZoneDateRange(for day: ListeningLocalDay) -> ListeningDateRange? {
-        currentTimeZoneDateRange(from: day, through: day)
+    static func currentTimeZoneDateRange(
+        for day: ListeningLocalDay,
+        timeZone: TimeZone = .current
+    ) -> ListeningDateRange? {
+        currentTimeZoneDateRange(from: day, through: day, timeZone: timeZone)
     }
     static func validateListeningScope(year: Int?, day: ListeningLocalDay?) throws {
         if let year, !(0...9999).contains(year) {

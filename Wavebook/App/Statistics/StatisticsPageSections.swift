@@ -32,7 +32,11 @@ extension StatisticsPageViewController {
 
         contentStack.addArrangedSubview(dayTitleLabel)
         contentStack.addArrangedSubview(daySummaryLabel)
+        contentStack.addArrangedSubview(timelineControlsStack)
         contentStack.addArrangedSubview(timelineStack)
+        timelineStack.addArrangedSubview(timelineEmptyLabel)
+        timelineStack.addArrangedSubview(timelineTable)
+        constrainSectionToContentWidth(timelineTable)
         contentStack.addArrangedSubview(loadMoreButton)
 
         for dimension in ListeningStatisticsDimension.allCases {
@@ -49,7 +53,7 @@ extension StatisticsPageViewController {
         constrainSectionToContentWidth(skipped.rows)
         contentStack.addArrangedSubview(skipped.empty)
     }
-    private func constrainSectionToContentWidth(_ section: NSStackView) {
+    private func constrainSectionToContentWidth(_ section: NSView) {
         let edgeInsets = contentStack.edgeInsets
         section.widthAnchor.constraint(
             equalTo: contentStack.widthAnchor,
@@ -87,11 +91,60 @@ extension StatisticsPageViewController {
         resetButton.target = self
         resetButton.action = #selector(resetClicked)
         resetButton.setAccessibilityLabel("Reset listening history")
+        undoRemovalButton.bezelStyle = .rounded
+        undoRemovalButton.contentTintColor = AppTheme.accent
+        undoRemovalButton.target = self
+        undoRemovalButton.action = #selector(undoRemovalClicked)
+        undoRemovalButton.setAccessibilityLabel("Undo listening-history removal")
+        undoRemovalButton.isHidden = true
         loadMoreButton.bezelStyle = .rounded
         loadMoreButton.contentTintColor = AppTheme.accent
         loadMoreButton.target = self
         loadMoreButton.action = #selector(loadMoreClicked)
         loadMoreButton.isHidden = true
+        configureTimelineViews()
+    }
+
+    private func configureTimelineViews() {
+        selectTimelineButton.bezelStyle = .rounded
+        selectTimelineButton.target = self
+        selectTimelineButton.action = #selector(toggleTimelineSelectionMode)
+        selectTimelineButton.setAccessibilityLabel("Select listening history entries")
+        removeSelectedButton.bezelStyle = .rounded
+        removeSelectedButton.contentTintColor = .systemRed
+        removeSelectedButton.target = self
+        removeSelectedButton.action = #selector(removeSelectedTimelineEntries)
+        removeSelectedButton.setAccessibilityLabel("Remove selected listening history entries")
+        removeSelectedButton.isHidden = true
+        timelineTable.headerView = nil
+        timelineTable.allowsMultipleSelection = true
+        timelineTable.rowHeight = 24
+        timelineTable.intercellSpacing = .zero
+        timelineTable.backgroundColor = .clear
+        timelineTable.selectionHighlightStyle = .regular
+        timelineTable.translatesAutoresizingMaskIntoConstraints = false
+        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("ListeningHistoryTimelineRow"))
+        column.title = ""
+        timelineTable.addTableColumn(column)
+        timelineTable.delegate = self
+        timelineTable.dataSource = self
+        timelineTableHeightConstraint = timelineTable.heightAnchor.constraint(equalToConstant: 0)
+        timelineTableHeightConstraint?.isActive = true
+        timelineControlsStack.orientation = .horizontal
+        timelineControlsStack.alignment = .centerY
+        timelineControlsStack.spacing = 8
+        timelineControlsStack.addArrangedSubview(selectTimelineButton)
+        timelineControlsStack.addArrangedSubview(removeSelectedButton)
+        timelineControlsStack.isHidden = true
+        timelineEmptyLabel.font = .systemFont(ofSize: 12)
+        timelineEmptyLabel.textColor = AppTheme.secondaryText
+        timelineEmptyLabel.isHidden = true
+        timelineStack.orientation = .vertical
+        timelineStack.alignment = .leading
+        timelineStack.spacing = 3
+        dayTitleLabel.isHidden = true
+        daySummaryLabel.isHidden = true
+        timelineStack.isHidden = true
     }
 
     private func configureLabelsAndActions() {
@@ -131,12 +184,6 @@ extension StatisticsPageViewController {
         dayTitleLabel.textColor = AppTheme.primaryText
         daySummaryLabel.font = .systemFont(ofSize: 12)
         daySummaryLabel.textColor = AppTheme.secondaryText
-        timelineStack.orientation = .vertical
-        timelineStack.alignment = .leading
-        timelineStack.spacing = 3
-        dayTitleLabel.isHidden = true
-        daySummaryLabel.isHidden = true
-        timelineStack.isHidden = true
     }
 
     private func configureContentStack() {
@@ -156,7 +203,8 @@ extension StatisticsPageViewController {
 
     private func configureHeader() {
         [
-            previousYearButton, yearLabel, nextYearButton, loadingIndicator, statusLabel, NSView(), resetButton
+            previousYearButton, yearLabel, nextYearButton, loadingIndicator, statusLabel,
+            undoRemovalButton, NSView(), resetButton
         ].forEach { headerStack.addArrangedSubview($0) }
         headerStack.orientation = .horizontal
         headerStack.spacing = 10

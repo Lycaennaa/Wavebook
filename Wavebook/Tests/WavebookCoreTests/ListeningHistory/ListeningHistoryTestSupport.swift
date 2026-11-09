@@ -9,17 +9,18 @@ final class ListeningHistoryTests: XCTestCase {
         startAtUTC: Date,
         day: ListeningLocalDay,
         listenedSeconds: TimeInterval,
-        includeSkip: Bool = false
+        includeSkip: Bool = false,
+        timeZone: TimeZone = .current
     ) throws {
         let state = try database.listeningHistoryState()
         let eventID = UUID()
-        let startedOffset = TimeZone.current.secondsFromGMT(for: startAtUTC)
+        let startedOffset = timeZone.secondsFromGMT(for: startAtUTC)
         let qualificationAtUTC = startAtUTC.addingTimeInterval(1)
-        let qualificationOffset = TimeZone.current.secondsFromGMT(for: qualificationAtUTC)
+        let qualificationOffset = timeZone.secondsFromGMT(for: qualificationAtUTC)
         let skipAtUTC = startAtUTC.addingTimeInterval(2)
-        let skipOffset = TimeZone.current.secondsFromGMT(for: skipAtUTC)
+        let skipOffset = timeZone.secondsFromGMT(for: skipAtUTC)
         let endedAtUTC = startAtUTC.addingTimeInterval(max(listenedSeconds, 5))
-        let endedOffset = TimeZone.current.secondsFromGMT(for: endedAtUTC)
+        let endedOffset = timeZone.secondsFromGMT(for: endedAtUTC)
         XCTAssertEqual(
             try database.beginListeningEvent(
                 eventID: eventID,

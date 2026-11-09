@@ -5,6 +5,7 @@ This file records user-visible changes prepared for publication. The release wor
 ## Unreleased
 
 - Saved library-folder bookmarks are reused for later scans.
+- Added bulk removal and session-scoped Undo for finalized qualified-play entries in listening-history timelines.
 - Saved playback volume separately for each output device and added auto-resume when output changes, including macOS pauses on Bluetooth disconnect.
 - Added guided onboarding with multiple-folder setup, background scans, per-folder progress, matched-lyric counts, personalization, and Help/Settings reruns.
 - Added safe folder removal, which removes indexed tracks without deleting audio files.

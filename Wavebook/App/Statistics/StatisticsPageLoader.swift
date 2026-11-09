@@ -156,6 +156,7 @@ final class StatisticsPageLoader {
     func loadTimelinePage(
         day: ListeningLocalDay,
         cursor: ListeningTimelineCursor?,
+        timeZone: TimeZone,
         databaseProvider: @escaping DatabaseProvider,
         completion: @escaping TimelineCompletion
     ) -> Bool {
@@ -167,7 +168,7 @@ final class StatisticsPageLoader {
         let query = Task.detached(priority: .userInitiated) {
             try LibraryDatabase.withCatalogCancellationToken(cancellation) {
                 try Task.checkCancellation()
-                let page = try database.qualifiedPlayTimeline(day: day, cursor: cursor)
+                let page = try database.qualifiedPlayTimeline(day: day, cursor: cursor, timeZone: timeZone)
                 try Task.checkCancellation()
                 return page
             }

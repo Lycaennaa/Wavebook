@@ -46,6 +46,7 @@ The following describes capabilities visible in the current source tree. Listed 
 ## Listening history and appearance
 
 - Record qualified listening history locally. View yearly and lifetime summaries, plays-per-day heatmaps, day timelines, rankings for songs, albums, artists, and genres, and top-skipped songs.
+- Select multiple loaded qualified-play entries from a day timeline with checkboxes or native list selection, remove their complete listening events, and undo the latest removal batch during the current app session.
 - Enable private listening to stop recording history, or reset stored listening history.
 - Use System appearance by default. Playback preferences such as volume, output device, ReplayGain, equalizer, and silence skipping persist locally.
 

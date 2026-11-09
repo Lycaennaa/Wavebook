@@ -38,6 +38,7 @@ final class StatisticsPageViewController: NSViewController {
     let nextYearButton = NSButton(title: "›", target: nil, action: nil)
     let yearLabel = NSTextField(labelWithString: "")
     let resetButton = NSButton(title: "Reset History…", target: nil, action: nil)
+    let undoRemovalButton = NSButton(title: "Undo Remove", target: nil, action: nil)
     let statusLabel = NSTextField(wrappingLabelWithString: "")
     let emptyLabel = NSTextField(wrappingLabelWithString: "")
     let errorLabel = NSTextField(wrappingLabelWithString: "")
@@ -51,8 +52,22 @@ final class StatisticsPageViewController: NSViewController {
     let focusInfoLabel = NSTextField(labelWithString: "")
     let dayTitleLabel = NSTextField(labelWithString: "")
     let daySummaryLabel = NSTextField(wrappingLabelWithString: "")
+    let timelineControlsStack = NSStackView()
+    let selectTimelineButton = NSButton(title: "Select", target: nil, action: nil)
+    let removeSelectedButton = NSButton(title: "Remove Selected", target: nil, action: nil)
     let timelineStack = NSStackView()
+    let timelineTable = NSTableView()
+    let timelineEmptyLabel = NSTextField(labelWithString: "No qualified plays this day.")
     let loadMoreButton = NSButton(title: "Load More", target: nil, action: nil)
+    var timelineEntries: [ListeningQualifiedPlayTimelineEntry] = []
+    var timelineTimeZone = TimeZone.current
+    var timelineSelection = StatisticsTimelineSelection()
+    var selectedTimelineEventIDs: Set<UUID> { timelineSelection.eventIDs }
+    var isTimelineSelectionMode: Bool { timelineSelection.isCheckboxMode }
+    var timelineTableHeightConstraint: NSLayoutConstraint?
+    var historyDeletionUndo: ListeningHistoryDeletion?
+    var undoVisibilityTask: Task<Void, Never>?
+    var undoVisibilityGeneration = 0
     var summaryColumnLabels: [[NSTextField]] = []
     var rankingSections: [ListeningStatisticsDimension: NSStackView] = [:]
     var skippedSection: StatisticsSkippedSection?

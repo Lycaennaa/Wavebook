@@ -37,6 +37,10 @@ enum AppTheme {
 
     static let selection = dynamicColor(named: "selection") { mode, appearance in
         let color = resolved(mode == .amoled ? .systemMint : .selectedContentBackgroundColor, with: appearance)
+        return color.withAlphaComponent(0.34)
+    }
+    static let hover = dynamicColor(named: "hover") { mode, appearance in
+        let color = resolved(mode == .amoled ? .systemMint : .selectedContentBackgroundColor, with: appearance)
         return color.withAlphaComponent(0.18)
     }
 
